@@ -2,6 +2,7 @@ package com.music.stream.neptune.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.music.stream.neptune.auth.UserSessionManager
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.RadioCountryAggModel
 import com.music.stream.neptune.data.entity.RadioGenreAggModel
@@ -17,7 +18,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class RadioViewModel @Inject constructor(private val repository: AppRepository) : ViewModel() {
+class RadioViewModel @Inject constructor(
+    private val repository: AppRepository,
+    private val userSessionManager: UserSessionManager
+) : ViewModel() {
 
     private val _countries: MutableStateFlow<Response<List<RadioCountryAggModel>>> =
         MutableStateFlow(Response.Loading())
@@ -57,11 +61,13 @@ class RadioViewModel @Inject constructor(private val repository: AppRepository) 
     private var currentCountry = "US"
     private var currentGenre = ""
     private var currentGenrePage = 0
-    private var currentUserId = "test"
+    private var currentUserId = ""
+
+    private fun currentUserIdOrEmail(): String = userSessionManager.userIdOrEmail()
 
     init {
         fetchCountries()
-        onCountrySelected("US", currentUserId)
+        onCountrySelected("US")
     }
 
     fun fetchCountries() = viewModelScope.launch(Dispatchers.IO) {
@@ -154,11 +160,13 @@ class RadioViewModel @Inject constructor(private val repository: AppRepository) 
         fetchGenreListing(currentGenre, currentGenrePage + 1, append = true)
     }
 
-    fun onCountrySelected(country: String, userId: String = currentUserId) {
+    fun onCountrySelected(country: String) {
         currentCountry = country
-        currentUserId = userId
-        fetchLastPlayedStations(userId)
-        fetchLikedStations(userId)
+        currentUserId = currentUserIdOrEmail()
+        if (currentUserId.isNotBlank()) {
+            fetchLastPlayedStations(currentUserId)
+            fetchLikedStations(currentUserId)
+        }
         fetchTrending(country)
         fetchGenres(country)
         browseStations(country, 1)

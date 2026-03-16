@@ -27,6 +27,16 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="${auth0Scheme}"
+                    android:host="${auth0Domain}"
+                    android:pathPrefix="/android/com.music.stream.neptune/callback" />
+            </intent-filter>
         </activity>
     </application>
 

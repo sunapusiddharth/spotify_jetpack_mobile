@@ -2,6 +2,7 @@ package com.music.stream.neptune.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.music.stream.neptune.auth.UserSessionManager
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.PodcastEpisodeModel
 import com.music.stream.neptune.data.entity.PodcastModel
@@ -17,7 +18,10 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class PodcastViewModel @Inject constructor(private val repository: AppRepository) : ViewModel() {
+class PodcastViewModel @Inject constructor(
+    private val repository: AppRepository,
+    private val userSessionManager: UserSessionManager
+) : ViewModel() {
 
     private val _podcasts: MutableStateFlow<Response<PodcastBrowseResponse>> =
         MutableStateFlow(Response.Loading())
@@ -65,8 +69,16 @@ class PodcastViewModel @Inject constructor(private val repository: AppRepository
     init {
         fetchPodcasts(1)
         fetchGenres()
-        fetchLikedPodcasts("test")
-        fetchTopPodcastsByUserActivity("test")
+        fetchLikedAndTopForCurrentUser()
+    }
+
+    private fun currentUserIdOrEmail(): String = userSessionManager.userIdOrEmail()
+
+    fun fetchLikedAndTopForCurrentUser() {
+        val userId = currentUserIdOrEmail()
+        if (userId.isBlank()) return
+        fetchLikedPodcasts(userId)
+        fetchTopPodcastsByUserActivity(userId)
     }
 
     fun fetchPodcasts(page: Int) = viewModelScope.launch(Dispatchers.IO) {
@@ -195,6 +207,15 @@ class PodcastViewModel @Inject constructor(private val repository: AppRepository
                 }
             }
         }
+
+    fun requestPodcastEpisodesPopulation(podcastId: String) {
+        val userId = currentUserIdOrEmail()
+        if (userId.isBlank()) {
+            _actionMessage.value = "Login required"
+            return
+        }
+        requestPodcastEpisodesPopulation(userId, podcastId)
+    }
 
     fun setSelectedEpisode(id: String) {
         _selectedEpisodeId.value = id

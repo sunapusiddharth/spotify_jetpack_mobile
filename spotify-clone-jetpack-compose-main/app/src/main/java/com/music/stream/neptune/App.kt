@@ -1,29 +1,58 @@
 package com.music.stream.neptune
 
 import android.annotation.SuppressLint
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.music.stream.neptune.ui.navigation.AppDrawer
 import com.music.stream.neptune.ui.navigation.MainBottomNavigation
 import com.music.stream.neptune.ui.navigation.MyNavHost
 import com.music.stream.neptune.ui.navigation.Routes
+import com.music.stream.neptune.ui.screens.AuthLoadingScreen
+import com.music.stream.neptune.ui.screens.AuthLoginScreen
+import com.music.stream.neptune.ui.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
 
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun App() {
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val authState by authViewModel.uiState.collectAsState()
+    val activity = LocalContext.current as? ComponentActivity
+
+    if (authState.loading) {
+        AuthLoadingScreen()
+        return
+    }
+
+    if (!authState.authenticated) {
+        AuthLoginScreen(
+            state = authState,
+            onLogin = {
+                if (activity != null) {
+                    authViewModel.login(activity)
+                }
+            },
+            onRetry = { authViewModel.refreshSession() }
+        )
+        return
+    }
+
     val bottomBarState = rememberSaveable { (mutableStateOf(true)) }
     val bottomBarPlayerState = rememberSaveable { (mutableStateOf(true)) }
     val navController = rememberNavController()
@@ -61,7 +90,14 @@ fun App() {
             AppDrawer(
                 currentRoute = currentRoute,
                 navController = navController,
-                onClose = { coroutineScope.launch { drawerState.close() } }
+                userName = authState.user?.name.orEmpty(),
+                userEmail = authState.user?.email.orEmpty(),
+                onClose = { coroutineScope.launch { drawerState.close() } },
+                onLogout = {
+                    if (activity != null) {
+                        authViewModel.logout(activity)
+                    }
+                }
             )
         }
     ) {

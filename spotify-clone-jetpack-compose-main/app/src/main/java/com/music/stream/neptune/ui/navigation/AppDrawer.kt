@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Podcasts
 import androidx.compose.material.icons.filled.Radio
@@ -38,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -63,10 +65,15 @@ private val drawerItems = listOf(
 fun AppDrawer(
     currentRoute: String?,
     navController: NavController,
-    onClose: () -> Unit
+    userName: String,
+    userEmail: String,
+    onClose: () -> Unit,
+    onLogout: () -> Unit
 ) {
-    val bgColor = Color(AppBackground.toArgb())
     val accentColor = Color(AppPalette.toArgb())
+    val displayName = userName.ifBlank { "Listener" }
+    val displayEmail = userEmail.ifBlank { "Signed in with Auth0" }
+    val initial = displayName.firstOrNull()?.uppercaseChar()?.toString() ?: "L"
 
     ModalDrawerSheet(
         drawerContainerColor = Color(0xFF0D0D18),
@@ -91,24 +98,23 @@ fun AppDrawer(
                         .background(accentColor),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.GraphicEq,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp)
-                    )
+                    Text(text = initial, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "Neptune",
+                    text = displayName,
                     color = Color.White,
                     fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = "Music Streaming",
+                    text = displayEmail,
                     color = Color.Gray,
-                    fontSize = 13.sp
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
@@ -148,6 +154,35 @@ fun AppDrawer(
                 thickness = 0.5.dp,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        onClose()
+                        onLogout()
+                    }
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Logout,
+                    contentDescription = "Logout",
+                    tint = Color(0xFFFF7A7A),
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = "Log Out",
+                    color = Color(0xFFFFB4AB),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

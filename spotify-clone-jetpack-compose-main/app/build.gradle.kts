@@ -20,6 +20,17 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+
+        val auth0Domain = (project.findProperty("AUTH0_DOMAIN") as String?) ?: ""
+        val auth0ClientId = (project.findProperty("AUTH0_CLIENT_ID") as String?) ?: ""
+        val auth0Scheme = (project.findProperty("AUTH0_SCHEME") as String?) ?: "com.music.stream.neptune.auth0"
+
+        manifestPlaceholders["auth0Domain"] = auth0Domain
+        manifestPlaceholders["auth0Scheme"] = auth0Scheme
+
+        buildConfigField("String", "AUTH0_DOMAIN", "\"$auth0Domain\"")
+        buildConfigField("String", "AUTH0_CLIENT_ID", "\"$auth0ClientId\"")
+        buildConfigField("String", "AUTH0_SCHEME", "\"$auth0Scheme\"")
     }
 
     buildTypes {
@@ -40,6 +51,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.1"
@@ -100,6 +112,9 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // Auth0
+    implementation("com.auth0.android:auth0:2.9.3")
 }
 kapt {
     correctErrorTypes = true

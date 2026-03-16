@@ -16,6 +16,7 @@ import com.music.stream.neptune.data.entity.UserPlaylistModel
 import com.music.stream.neptune.di.CurrentSongState
 import com.music.stream.neptune.di.PlaybackMediaType
 import com.music.stream.neptune.di.SongPlayer
+import com.music.stream.neptune.auth.UserSessionManager
 import com.music.stream.neptune.ui.repository.AppRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -29,10 +30,13 @@ import javax.inject.Inject
 @HiltViewModel
 class PlayerViewModel @Inject constructor(
     private val currentSongState: CurrentSongState,
-    private val repository: AppRepository
+    private val repository: AppRepository,
+    private val userSessionManager: UserSessionManager
 ) : ViewModel() {
 
-    private val defaultUserId = "test"
+    private fun currentUserIdOrEmail(): String {
+        return userSessionManager.userIdOrEmail()
+    }
 
     val currentSongTitle: State<String> get() = currentSongState.title
     val currentSongSinger: State<String> get() = currentSongState.singer
@@ -97,9 +101,13 @@ class PlayerViewModel @Inject constructor(
         queueSongs: List<SongsModel>,
         startIndex: Int,
         album: String,
-        context: Context,
-        userId: String = defaultUserId
+        context: Context
     ) = viewModelScope.launch(Dispatchers.IO) {
+        val userId = currentUserIdOrEmail()
+        if (userId.isBlank()) {
+            _actionMessage.value = "Login required"
+            return@launch
+        }
         repository.provideAddPlaylistToQueue(userId, queueSongs.map { it.id }).collect { result ->
             when (result) {
                 is Response.Success -> {
@@ -129,8 +137,7 @@ class PlayerViewModel @Inject constructor(
     fun startRadioPlayback(
         queue: List<RadioStationModel>,
         startIndex: Int,
-        context: Context,
-        userId: String = "test"
+        context: Context
     ) {
         if (queue.isEmpty()) return
         val safeIndex = startIndex.coerceIn(0, queue.lastIndex)
@@ -147,7 +154,10 @@ class PlayerViewModel @Inject constructor(
         )
         SongPlayer.playSong(station.stream_url, context)
         viewModelScope.launch(Dispatchers.IO) {
-            repository.provideUserListenedStation(userId, station.id, 0).collect { }
+            val userId = currentUserIdOrEmail()
+            if (userId.isNotBlank()) {
+                repository.provideUserListenedStation(userId, station.id, 0).collect { }
+            }
         }
     }
 
@@ -155,8 +165,7 @@ class PlayerViewModel @Inject constructor(
         podcast: PodcastModel,
         queue: List<PodcastEpisodeModel>,
         startIndex: Int,
-        context: Context,
-        userId: String = "test"
+        context: Context
     ) {
         if (queue.isEmpty()) return
         val safeIndex = startIndex.coerceIn(0, queue.lastIndex)
@@ -173,7 +182,10 @@ class PlayerViewModel @Inject constructor(
         )
         SongPlayer.playSong(episode.url, context)
         viewModelScope.launch(Dispatchers.IO) {
-            repository.provideUserListenedPodcastsAction(userId, podcast.id, 0, episode.id).collect { }
+            val userId = currentUserIdOrEmail()
+            if (userId.isNotBlank()) {
+                repository.provideUserListenedPodcastsAction(userId, podcast.id, 0, episode.id).collect { }
+            }
         }
     }
 
@@ -181,7 +193,12 @@ class PlayerViewModel @Inject constructor(
         when (mediaType.value) {
             PlaybackMediaType.SONG -> {
                 viewModelScope.launch(Dispatchers.IO) {
-                    repository.provideNextQueueItem(defaultUserId).collect { result ->
+                    val userId = currentUserIdOrEmail()
+                    if (userId.isBlank()) {
+                        _actionMessage.value = "Login required"
+                        return@launch
+                    }
+                    repository.provideNextQueueItem(userId).collect { result ->
                         when (result) {
                             is Response.Success -> withContext(Dispatchers.Main) {
                                 applyQueueUpdate(result.data, context)
@@ -212,7 +229,12 @@ class PlayerViewModel @Inject constructor(
         when (mediaType.value) {
             PlaybackMediaType.SONG -> {
                 viewModelScope.launch(Dispatchers.IO) {
-                    repository.providePrevQueueItem(defaultUserId).collect { result ->
+                    val userId = currentUserIdOrEmail()
+                    if (userId.isBlank()) {
+                        _actionMessage.value = "Login required"
+                        return@launch
+                    }
+                    repository.providePrevQueueItem(userId).collect { result ->
                         when (result) {
                             is Response.Success -> withContext(Dispatchers.Main) {
                                 applyQueueUpdate(result.data, context)
@@ -239,12 +261,21 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun loadUserPlaylists(userId: String = defaultUserId) = viewModelScope.launch(Dispatchers.IO) {
+    fun loadUserPlaylists() = viewModelScope.launch(Dispatchers.IO) {
+        val userId = currentUserIdOrEmail()
+        if (userId.isBlank()) {
+            _actionMessage.value = "Login required"
+            return@launch
+        }
         repository.provideUserPlaylists(userId).collect { _userPlaylists.value = it }
     }
 
-    fun addCurrentSongToPlaylist(playlistId: String, userId: String = defaultUserId) =
-        viewModelScope.launch(Dispatchers.IO) {
+    fun addCurrentSongToPlaylist(playlistId: String) = viewModelScope.launch(Dispatchers.IO) {
+            val userId = currentUserIdOrEmail()
+            if (userId.isBlank()) {
+                _actionMessage.value = "Login required"
+                return@launch
+            }
             val songId = currentSongId.value
             if (songId.isBlank()) return@launch
             repository.provideAddSongToPlaylist(
@@ -261,7 +292,12 @@ class PlayerViewModel @Inject constructor(
             }
         }
 
-    fun requestCurrentTrackAddition(userId: String = defaultUserId) = viewModelScope.launch(Dispatchers.IO) {
+    fun requestCurrentTrackAddition() = viewModelScope.launch(Dispatchers.IO) {
+        val userId = currentUserIdOrEmail()
+        if (userId.isBlank()) {
+            _actionMessage.value = "Login required"
+            return@launch
+        }
         val songId = currentSongId.value
         if (songId.isBlank() || mediaType.value != PlaybackMediaType.SONG) return@launch
         repository.provideRequestTrackAddition(userId, songId).collect { result ->
@@ -273,7 +309,12 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun toggleLikeCurrentMedia(userId: String = defaultUserId) = viewModelScope.launch(Dispatchers.IO) {
+    fun toggleLikeCurrentMedia() = viewModelScope.launch(Dispatchers.IO) {
+        val userId = currentUserIdOrEmail()
+        if (userId.isBlank()) {
+            _actionMessage.value = "Login required"
+            return@launch
+        }
         val trackId = currentSongId.value
         if (trackId.isBlank()) return@launch
         val nextState = !likeState.value
@@ -294,7 +335,7 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun onPlaybackProgress(secondsPlayed: Long, userId: String = "test") {
+    fun onPlaybackProgress(secondsPlayed: Long) {
         if (mediaType.value != PlaybackMediaType.PODCAST) return
         if (secondsPlayed <= 0L || secondsPlayed % 30L != 0L || secondsPlayed == lastPodcastProgressCheckpointSec) return
 
@@ -306,7 +347,10 @@ class PlayerViewModel @Inject constructor(
 
         lastPodcastProgressCheckpointSec = secondsPlayed
         viewModelScope.launch(Dispatchers.IO) {
-            repository.provideUserListenedPodcastsAction(userId, podcast.id, secondsPlayed.toInt(), episode.id).collect { }
+            val userId = currentUserIdOrEmail()
+            if (userId.isNotBlank()) {
+                repository.provideUserListenedPodcastsAction(userId, podcast.id, secondsPlayed.toInt(), episode.id).collect { }
+            }
         }
     }
 

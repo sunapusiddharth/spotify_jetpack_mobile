@@ -224,7 +224,7 @@ fun PodcastDetailScreen(navController: NavController, podcastId: String?) {
                         }
                         Button(
                             onClick = {
-                                viewModel.requestPodcastEpisodesPopulation("test", podcast.id)
+                                viewModel.requestPodcastEpisodesPopulation(podcast.id)
                             }
                         ) {
                             Text("Request")

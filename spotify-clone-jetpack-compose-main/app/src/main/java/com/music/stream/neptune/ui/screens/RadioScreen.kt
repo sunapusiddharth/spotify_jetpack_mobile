@@ -95,7 +95,7 @@ fun RadioScreen(navController: NavController) {
     }
 
     LaunchedEffect(selectedCountry) {
-        radioViewModel.onCountrySelected(selectedCountry, "test")
+        radioViewModel.onCountrySelected(selectedCountry)
         selectedGenreTab = 0
     }
 
