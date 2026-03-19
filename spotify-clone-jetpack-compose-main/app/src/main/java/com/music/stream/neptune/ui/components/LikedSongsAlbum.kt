@@ -181,7 +181,7 @@ fun LikedSongsScreen(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
                                 ) {
-                                    SongPlayer.playSong(likedSongs[0].url, context)
+                                    SongPlayer.playSong(likedSongs[0], context)
                                     albumViewModel.updateSongState(
                                         likedSongs[0].thumbnail,
                                         likedSongs[0].name,
@@ -224,7 +224,7 @@ fun LikedSongsScreen(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
                             ) {
-                                SongPlayer.playSong(song.url, context)
+                                SongPlayer.playSong(song, context)
                                 albumViewModel.updateSongState(
                                     song.thumbnail,
                                     song.name,

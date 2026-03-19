@@ -268,7 +268,7 @@ fun SumUpArtistScreen(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
                                     ) {
-                                        SongPlayer.playSong(songs[0].url, context)
+                                        SongPlayer.playSong(songs[0], context)
                                         artistViewModel.updateSongState(
                                             songs[0].thumbnail,
                                             songs[0].name,
@@ -300,7 +300,7 @@ fun SumUpArtistScreen(
                                     ) {
                                         val shuffled = songs.shuffled()
                                         if (shuffled.isNotEmpty()) {
-                                            SongPlayer.playSong(shuffled[0].url, context)
+                                            SongPlayer.playSong(shuffled[0], context)
                                             artistViewModel.updateSongState(
                                                 shuffled[0].thumbnail,
                                                 shuffled[0].name,
@@ -423,7 +423,7 @@ fun ArtistSongsTab(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
-                            SongPlayer.playSong(song.url, context)
+                            SongPlayer.playSong(song, context)
                             artistViewModel.updateSongState(
                                 song.thumbnail, song.name, artist.title,
                                 true, song.id, index

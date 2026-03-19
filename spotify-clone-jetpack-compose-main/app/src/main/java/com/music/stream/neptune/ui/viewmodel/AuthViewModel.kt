@@ -17,7 +17,8 @@ data class AuthUiState(
     val authenticated: Boolean = false,
     val user: AuthUserSession? = null,
     val errorMessage: String? = null,
-    val configured: Boolean = true
+    val configured: Boolean = true,
+    val bypassEnabled: Boolean = false
 )
 
 @HiltViewModel
@@ -34,13 +35,27 @@ class AuthViewModel @Inject constructor(
     }
 
     fun refreshSession() = viewModelScope.launch {
+        if (authManager.isBypassEnabled()) {
+            val session = authManager.getBypassSession()
+            userSessionManager.setSession(session)
+            _uiState.value = AuthUiState(
+                loading = false,
+                authenticated = true,
+                user = session,
+                configured = true,
+                bypassEnabled = true
+            )
+            return@launch
+        }
+
         if (!authManager.isConfigured()) {
             userSessionManager.setSession(null)
             _uiState.value = AuthUiState(
                 loading = false,
                 authenticated = false,
                 configured = false,
-                errorMessage = "Auth0 is not configured"
+                errorMessage = "Auth0 is not configured",
+                bypassEnabled = false
             )
             return@launch
         }
@@ -53,7 +68,8 @@ class AuthViewModel @Inject constructor(
                 loading = false,
                 authenticated = session != null,
                 user = session,
-                configured = true
+                configured = true,
+                bypassEnabled = false
             )
         }.onFailure { error ->
             userSessionManager.setSession(null)
@@ -61,12 +77,26 @@ class AuthViewModel @Inject constructor(
                 loading = false,
                 authenticated = false,
                 configured = true,
-                errorMessage = error.message
+                errorMessage = error.message,
+                bypassEnabled = false
             )
         }
     }
 
     fun login(activity: Activity) = viewModelScope.launch {
+        if (authManager.isBypassEnabled()) {
+            val session = authManager.getBypassSession()
+            userSessionManager.setSession(session)
+            _uiState.value = AuthUiState(
+                loading = false,
+                authenticated = true,
+                user = session,
+                configured = true,
+                bypassEnabled = true
+            )
+            return@launch
+        }
+
         _uiState.value = _uiState.value.copy(loading = true, errorMessage = null)
         runCatching { authManager.login(activity) }
             .onSuccess { session ->
@@ -75,7 +105,8 @@ class AuthViewModel @Inject constructor(
                     loading = false,
                     authenticated = true,
                     user = session,
-                    configured = true
+                    configured = true,
+                    bypassEnabled = false
                 )
             }
             .onFailure { error ->
@@ -88,12 +119,27 @@ class AuthViewModel @Inject constructor(
     }
 
     fun logout(activity: Activity) = viewModelScope.launch {
+        if (authManager.isBypassEnabled()) {
+            val session = authManager.getBypassSession()
+            userSessionManager.setSession(session)
+            _uiState.value = AuthUiState(
+                loading = false,
+                authenticated = true,
+                user = session,
+                configured = true,
+                bypassEnabled = true,
+                errorMessage = "Auth bypass is enabled in gradle.properties"
+            )
+            return@launch
+        }
+
         runCatching { authManager.logout(activity) }
         userSessionManager.setSession(null)
         _uiState.value = AuthUiState(
             loading = false,
             authenticated = false,
-            configured = authManager.isConfigured()
+            configured = authManager.isConfigured(),
+            bypassEnabled = false
         )
     }
 }

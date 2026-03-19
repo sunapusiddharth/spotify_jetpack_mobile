@@ -24,5 +24,5 @@ fun getLikedAlbumIds(context: Context): Set<String> {
 }
 
 fun getAlbumsByIds(albumIds: Set<String>, albums: List<AlbumsModel>): List<AlbumsModel> {
-    return albums.filter { album -> album.id.toString() in albumIds }
+    return albums.filter { album -> album.id in albumIds }
 }

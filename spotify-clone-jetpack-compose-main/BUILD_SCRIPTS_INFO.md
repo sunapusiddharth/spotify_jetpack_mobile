@@ -62,6 +62,9 @@ The most important and easiest script to use.
 # Build release APK
 ./spotify-build.sh build --release
 
+# Build signed release APK you can copy/install manually
+./build_signed_release.sh
+
 # Get help
 ./spotify-build.sh --help
 ```
@@ -138,6 +141,29 @@ If you prefer fine-grained control:
 **Usage:**
 ```bash
 ./launch_app.sh
+```
+
+---
+
+### 6. `build_signed_release.sh` - Signed Release APK
+**What it does:**
+- Generates a release keystore automatically if missing
+- Builds a signed release APK
+- Copies the final APK to the project root
+
+**Usage:**
+```bash
+./build_signed_release.sh
+```
+
+**Output:**
+```bash
+spotify-neptune-release.apk
+```
+
+**Optional overrides:**
+```bash
+KEYSTORE_FILE=app/my-release.jks KEY_ALIAS=myalias KS_PASS=secret ./build_signed_release.sh
 ```
 
 ---

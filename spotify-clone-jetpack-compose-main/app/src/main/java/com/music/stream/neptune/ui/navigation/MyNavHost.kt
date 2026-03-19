@@ -1,6 +1,4 @@
 package com.music.stream.neptune.ui.navigation
-
-import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -32,8 +30,6 @@ fun MyNavHost(
 ) {
     val playerViewModel: PlayerViewModel = hiltViewModel()
     val playerState by playerViewModel.currentSongTitle
-
-    Log.d("player", playerState)
 
     NavHost(navController = navHostController, startDestination = Routes.Home.route) {
 
@@ -141,7 +137,7 @@ fun MyNavHost(
                 bottomBarState.value = true
                 bottomBarPlayerState.value = playerState.isNotEmpty()
             }
-            AvailableTracksScreen(navHostController)
+            AvailableTracksScreen()
         }
 
         // Playlist

@@ -31,16 +31,34 @@ class Auth0AuthManager @Inject constructor(
     private val apiClient = AuthenticationAPIClient(account)
     private val credentialsManager = CredentialsManager(apiClient, SharedPreferencesStorage(context))
 
+    fun isBypassEnabled(): Boolean = BuildConfig.AUTH_BYPASS_ENABLED
+
+    fun getBypassSession(): AuthUserSession {
+        val userId = BuildConfig.AUTH_BYPASS_USER_ID.ifBlank { "test-user" }
+        val email = BuildConfig.AUTH_BYPASS_USER_EMAIL.ifBlank { "$userId@test.local" }
+        return AuthUserSession(
+            userId = userId,
+            email = email,
+            name = BuildConfig.AUTH_BYPASS_USER_NAME.ifBlank { "Test Listener" },
+            pictureUrl = ""
+        )
+    }
+
     fun isConfigured(): Boolean {
-        return BuildConfig.AUTH0_CLIENT_ID.isNotBlank() && BuildConfig.AUTH0_DOMAIN.isNotBlank()
+        return isBypassEnabled() ||
+            (BuildConfig.AUTH0_CLIENT_ID.isNotBlank() && BuildConfig.AUTH0_DOMAIN.isNotBlank())
     }
 
     suspend fun hasValidSession(): Boolean {
+        if (isBypassEnabled()) return true
         if (!isConfigured()) return false
         return credentialsManager.hasValidCredentials()
     }
 
     suspend fun login(activity: Activity): AuthUserSession {
+        if (isBypassEnabled()) {
+            return getBypassSession()
+        }
         if (!isConfigured()) {
             throw IllegalStateException("Auth0 is not configured. Set AUTH0_DOMAIN and AUTH0_CLIENT_ID.")
         }
@@ -63,6 +81,7 @@ class Auth0AuthManager @Inject constructor(
     }
 
     suspend fun getCurrentSession(): AuthUserSession? {
+        if (isBypassEnabled()) return getBypassSession()
         if (!isConfigured()) return null
         if (!credentialsManager.hasValidCredentials()) return null
         val credentials = suspendCancellableCoroutine<Credentials> { cont ->
@@ -80,6 +99,7 @@ class Auth0AuthManager @Inject constructor(
     }
 
     suspend fun logout(activity: Activity) {
+        if (isBypassEnabled()) return
         if (!isConfigured()) return
         suspendCancellableCoroutine<Unit> { cont ->
             WebAuthProvider.logout(account)

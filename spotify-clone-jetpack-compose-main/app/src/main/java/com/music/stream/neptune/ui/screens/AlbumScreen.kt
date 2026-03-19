@@ -150,7 +150,7 @@ fun SumUpAlbumScreen(
     }
 
     var isAlbumSaved by remember {
-        mutableStateOf(isAlbumLiked(context, album.id.toString()))
+        mutableStateOf(isAlbumLiked(context, album.id))
     }
 
     val totalDurationMs = albumSongs.sumOf { it.duration }
@@ -287,9 +287,9 @@ fun SumUpAlbumScreen(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
                                     ) {
-                                        if (isAlbumSaved) removeLikedAlbumId(context, album.id.toString())
-                                        else addLikedAlbumId(context, album.id.toString())
-                                        isAlbumSaved = isAlbumLiked(context, album.id.toString())
+                                        if (isAlbumSaved) removeLikedAlbumId(context, album.id)
+                                        else addLikedAlbumId(context, album.id)
+                                        isAlbumSaved = isAlbumLiked(context, album.id)
                                     },
                                 painter = if (isAlbumSaved) painterResource(R.drawable.added)
                                 else painterResource(R.drawable.ic_add),
@@ -312,7 +312,7 @@ fun SumUpAlbumScreen(
                                             indication = null
                                         ) {
                                             val shuffled = albumSongs.shuffled()
-                                            SongPlayer.playSong(shuffled[0].url, context)
+                                            SongPlayer.playSong(shuffled[0], context)
                                             albumViewModel.updateSongState(
                                                 shuffled[0].thumbnail, shuffled[0].name,
                                                 shuffled[0].singer, true, shuffled[0].id, 0, album.title
@@ -352,7 +352,7 @@ fun SumUpAlbumScreen(
                                                     album.title
                                                 )
                                             } else {
-                                                SongPlayer.playSong(albumSongs[0].url, context)
+                                                SongPlayer.playSong(albumSongs[0], context)
                                                 albumViewModel.updateSongState(
                                                     albumSongs[0].thumbnail, albumSongs[0].name,
                                                     albumSongs[0].singer, true, albumSongs[0].id, 0, album.title
@@ -396,7 +396,7 @@ fun SumUpAlbumScreen(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
-                            SongPlayer.playSong(song.url, context)
+                            SongPlayer.playSong(song, context)
                             albumViewModel.updateSongState(
                                 song.thumbnail, song.name, song.singer,
                                 true, song.id, index, album.title

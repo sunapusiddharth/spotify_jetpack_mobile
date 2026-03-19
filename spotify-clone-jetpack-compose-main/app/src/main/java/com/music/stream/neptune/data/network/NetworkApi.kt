@@ -6,6 +6,7 @@ import com.music.stream.neptune.data.entity.RadioStationModel
 import com.music.stream.neptune.data.entity.SongsModel
 import com.music.stream.neptune.data.entity.web.WebArtistType
 import com.music.stream.neptune.data.entity.web.WebMeiliSearchAggType
+import com.music.stream.neptune.data.entity.web.WebHomePageDataType
 import com.music.stream.neptune.data.entity.web.WebPlayListType
 import com.music.stream.neptune.data.entity.web.WebPodcastCardDto
 import com.music.stream.neptune.data.entity.web.WebPodcastsByGenrePageInfo
@@ -16,7 +17,10 @@ import com.music.stream.neptune.data.entity.web.WebRadioStation
 import com.music.stream.neptune.data.entity.web.WebRadioStationsPageInfo
 import com.music.stream.neptune.data.entity.web.WebSearchPageResType
 import com.music.stream.neptune.data.entity.web.WebSongType
+import com.music.stream.neptune.data.entity.web.WebUserType
 import com.music.stream.neptune.data.entity.web.WebUserPlayListType
+import com.google.gson.JsonObject
+import retrofit2.Response as RetrofitResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Path
@@ -25,6 +29,15 @@ import retrofit2.http.PUT
 import retrofit2.http.Query
 
 interface NetworkApi {
+
+    @GET("users/{id}")
+    suspend fun getUserById(@Path("id") userId: String): WebUserType
+
+    @GET("users/{id}/home/{page}")
+    suspend fun getHomePage(
+        @Path("id") userId: String,
+        @Path("page") page: Int
+    ): JsonObject
 
     // Album endpoints
     @GET("album/freshAlbums")
@@ -50,11 +63,17 @@ interface NetworkApi {
     @GET("tracks/top_scoring_songs/{limit}")
     suspend fun getTopScoringSongs(@Path("limit") limit: Int): List<WebSongType>
 
+    @GET("tracks/top_scoring_songs/{userid}/{limit}")
+    suspend fun getTopScoringSongsForUser(
+        @Path("userid") userId: String,
+        @Path("limit") limit: Int
+    ): List<WebSongType>
+
     @POST("tracks/{id}/add-multiple")
     suspend fun addPlaylistToQueue(
         @Path("id") userId: String,
         @Body body: AddMultipleTracksRequest
-    ): ApiStatusResponse
+    ): RetrofitResponse<Unit>
 
     @GET("tracks/{userid}/next_item_in_queue")
     suspend fun getNextQueueItem(@Path("userid") userId: String): QueueItemResponse
@@ -92,6 +111,12 @@ interface NetworkApi {
     @GET("tracks/allSongs/{page}/{limit}")
     suspend fun getAllSongs(
         @Path("page") page: Int,
+        @Path("limit") limit: Int
+    ): WebSongsPageResponse
+
+    @GET("stream/all_available_songs/{skip}/{limit}")
+    suspend fun getAllAvailableSongs(
+        @Path("skip") skip: Int,
         @Path("limit") limit: Int
     ): WebSongsPageResponse
 
@@ -195,11 +220,21 @@ interface NetworkApi {
     @GET("playlist_collection/{id}")
     suspend fun getPlaylistCollectionById(@Path("id") id: String): WebPlayListType
 
+    @GET("playlist_collection/getEditorsPlayList/{limit}")
+    suspend fun getEditorsPlayList(@Path("limit") limit: Int): WebHomePageDataType
+
     @GET("playlist_collection/latest")
     suspend fun getLatestPlaylistCollections(): WebPlaylistCollectionBrowseResponse
 
     @GET("playlist/{userid}/playlists")
     suspend fun getUserPlaylists(@Path("userid") userId: String): List<WebUserPlayListType>
+
+    @POST("playlist/{userid}/create-new-playlist/{name}")
+    suspend fun createNewPlaylist(
+        @Path("userid") userId: String,
+        @Path("name") name: String,
+        @Body body: CreatePlaylistRequest
+    ): WebUserPlayListType
 
     @PUT("playlist/{userid}/{songid}")
     suspend fun addSongToPlaylist(
@@ -213,9 +248,27 @@ data class AddMultipleTracksRequest(
     val songs: List<String> = emptyList()
 )
 
+data class WebHomePageInfo(
+    val results: List<WebHomePageDataType> = emptyList(),
+    val page: Int = 0
+)
+
 data class QueueItemResponse(
-    val song: WebSongType = WebSongType(),
-    val updated_queue: List<WebSongType> = emptyList()
+    val song: QueueSongResponse = QueueSongResponse(),
+    val updated_queue: List<QueueSongResponse> = emptyList()
+)
+
+data class QueueSongResponse(
+    val id: String = "",
+    val name: String = "",
+    val album: String = "",
+    val artists: List<String> = emptyList(),
+    val duration_ms: Int = 0,
+    val preview_url: String? = null,
+    val genres: List<String> = emptyList(),
+    val album_id: String = "",
+    val s3link: String? = null,
+    val thumbnail: String = ""
 )
 
 data class RequestTrackAdditionResponse(
@@ -228,6 +281,10 @@ data class RequestTrackAdditionResponse(
 data class AddSongToPlaylistRequest(
     val playlists: List<String> = emptyList(),
     val posterpath: String = ""
+)
+
+data class CreatePlaylistRequest(
+    val image: String = ""
 )
 
 data class WebArtistSongsPaginationResponse(

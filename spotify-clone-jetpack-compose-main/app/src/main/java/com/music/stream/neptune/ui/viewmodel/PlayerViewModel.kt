@@ -20,6 +20,7 @@ import com.music.stream.neptune.auth.UserSessionManager
 import com.music.stream.neptune.ui.repository.AppRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -33,6 +34,7 @@ class PlayerViewModel @Inject constructor(
     private val repository: AppRepository,
     private val userSessionManager: UserSessionManager
 ) : ViewModel() {
+    private var syncedPlaylistAlbumId: String? = null
 
     private fun currentUserIdOrEmail(): String {
         return userSessionManager.userIdOrEmail()
@@ -56,6 +58,7 @@ class PlayerViewModel @Inject constructor(
     val shuffleState = currentSongState.shuffle
     val repeatState = currentSongState.repeat
     val likeState = currentSongState.likeState
+    val likedSongIds: StateFlow<Set<String>> = repository.observeLikedSongIds()
 
     private val _actionMessage = MutableStateFlow<String?>(null)
     val actionMessage: StateFlow<String?> = _actionMessage
@@ -70,9 +73,45 @@ class PlayerViewModel @Inject constructor(
 
     val playingArtist by mutableStateOf(currentSongSinger.value)
     private var lastPodcastProgressCheckpointSec: Long = 0
+    private var observedUserId: String? = null
 
     init {
         fetchSongs()
+        observeUserLikes()
+        observeLikedSongState()
+    }
+
+    private fun observeUserLikes() = viewModelScope.launch {
+        userSessionManager.session.collectLatest { session ->
+            val userId = session?.idOrEmail.orEmpty()
+            if (userId == observedUserId) return@collectLatest
+
+            observedUserId = userId
+            if (userId.isBlank()) {
+                repository.clearCachedUserProfile()
+                syncCurrentSongLikeState()
+                return@collectLatest
+            }
+
+            repository.provideUserById(userId).collect { result ->
+                if (result is Response.Success) {
+                    syncCurrentSongLikeState()
+                }
+            }
+        }
+    }
+
+    private fun observeLikedSongState() = viewModelScope.launch {
+        likedSongIds.collectLatest {
+            syncCurrentSongLikeState()
+        }
+    }
+
+    private fun syncCurrentSongLikeState() {
+        val isLikedSong = mediaType.value == PlaybackMediaType.SONG &&
+            currentSongId.value.isNotBlank() &&
+            likedSongIds.value.contains(currentSongId.value)
+        currentSongState.updateLikeState(isLikedSong)
     }
 
     fun startSongPlayback(
@@ -94,7 +133,7 @@ class PlayerViewModel @Inject constructor(
             songIndex = safeIndex,
             album = album
         )
-        SongPlayer.playSong(song.url, context)
+        SongPlayer.playSong(song, context)
     }
 
     fun playSongQueueFromPlaylist(
@@ -103,20 +142,37 @@ class PlayerViewModel @Inject constructor(
         album: String,
         context: Context
     ) = viewModelScope.launch(Dispatchers.IO) {
+        if (queueSongs.isEmpty()) return@launch
+
         val userId = currentUserIdOrEmail()
         if (userId.isBlank()) {
             _actionMessage.value = "Login required"
             return@launch
         }
+
+        if (syncedPlaylistAlbumId == album) {
+            withContext(Dispatchers.Main) {
+                startSongPlayback(queueSongs, startIndex, album, context)
+            }
+            return@launch
+        }
+
         repository.provideAddPlaylistToQueue(userId, queueSongs.map { it.id }).collect { result ->
             when (result) {
                 is Response.Success -> {
+                    syncedPlaylistAlbumId = album
                     withContext(Dispatchers.Main) {
                         startSongPlayback(queueSongs, startIndex, album, context)
                         _actionMessage.value = "Queue synced from playlist"
                     }
                 }
-                is Response.Error -> _actionMessage.value = "Queue sync failed: ${result.error}"
+                is Response.Error -> {
+                    syncedPlaylistAlbumId = album
+                    withContext(Dispatchers.Main) {
+                        startSongPlayback(queueSongs, startIndex, album, context)
+                        _actionMessage.value = "Queue sync failed, playing locally"
+                    }
+                }
                 else -> Unit
             }
         }
@@ -152,7 +208,7 @@ class PlayerViewModel @Inject constructor(
             songIndex = safeIndex,
             album = "radio"
         )
-        SongPlayer.playSong(station.stream_url, context)
+        SongPlayer.playSong(station.stream_url, context, station.name, station.country, station.coverUri)
         viewModelScope.launch(Dispatchers.IO) {
             val userId = currentUserIdOrEmail()
             if (userId.isNotBlank()) {
@@ -180,7 +236,13 @@ class PlayerViewModel @Inject constructor(
             songIndex = safeIndex,
             album = podcast.id
         )
-        SongPlayer.playSong(episode.url, context)
+        SongPlayer.playSong(
+            episode.url,
+            context,
+            episode.title,
+            podcast.author,
+            if (episode.thumbnail.isNotEmpty()) episode.thumbnail else podcast.image
+        )
         viewModelScope.launch(Dispatchers.IO) {
             val userId = currentUserIdOrEmail()
             if (userId.isNotBlank()) {
@@ -292,6 +354,83 @@ class PlayerViewModel @Inject constructor(
             }
         }
 
+    fun saveCurrentSongToPlaylists(selectedPlaylistIds: Set<String>, newPlaylistName: String) =
+        viewModelScope.launch(Dispatchers.IO) {
+            val userId = currentUserIdOrEmail()
+            if (userId.isBlank()) {
+                _actionMessage.value = "Login required"
+                return@launch
+            }
+
+            val songId = currentSongId.value
+            if (songId.isBlank()) return@launch
+
+            val targetPlaylistIds = selectedPlaylistIds.toMutableSet()
+            val trimmedName = newPlaylistName.trim()
+
+            if (trimmedName.isNotEmpty()) {
+                var createFailed = false
+                repository.provideCreateNewPlaylist(userId, trimmedName, currentSongCoverUri.value).collect { result ->
+                    when (result) {
+                        is Response.Success -> {
+                            val createdPlaylist = result.data
+                            targetPlaylistIds.add(createdPlaylist.id)
+                            val currentPlaylists = (_userPlaylists.value as? Response.Success)?.data.orEmpty()
+                            _userPlaylists.value = Response.Success(
+                                currentPlaylists + createdPlaylist
+                            )
+                        }
+                        is Response.Error -> {
+                            createFailed = true
+                            _actionMessage.value = "Create playlist failed"
+                        }
+                        else -> Unit
+                    }
+                }
+                if (createFailed) return@launch
+            }
+
+            if (targetPlaylistIds.isEmpty()) {
+                _actionMessage.value = "Select or create a playlist"
+                return@launch
+            }
+
+            repository.provideAddSongToPlaylist(
+                userId = userId,
+                songId = songId,
+                playlistIds = targetPlaylistIds.toList(),
+                posterPath = currentSongCoverUri.value
+            ).collect { result ->
+                when (result) {
+                    is Response.Success -> {
+                        val currentPlaylists = (_userPlaylists.value as? Response.Success)?.data.orEmpty()
+                        _userPlaylists.value = Response.Success(
+                            currentPlaylists.map { playlist ->
+                                if (targetPlaylistIds.contains(playlist.id) && !playlist.tracks.contains(songId)) {
+                                    playlist.copy(tracks = playlist.tracks + songId)
+                                } else {
+                                    playlist
+                                }
+                            }
+                        )
+                        _actionMessage.value = if (trimmedName.isNotEmpty()) {
+                            "Playlist created and song added"
+                        } else {
+                            "Added to playlist"
+                        }
+                    }
+                    is Response.Error -> {
+                        _actionMessage.value = if (trimmedName.isNotEmpty()) {
+                            "Playlist created, but song add failed"
+                        } else {
+                            "Add to playlist failed"
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+        }
+
     fun requestCurrentTrackAddition() = viewModelScope.launch(Dispatchers.IO) {
         val userId = currentUserIdOrEmail()
         if (userId.isBlank()) {
@@ -310,6 +449,8 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun toggleLikeCurrentMedia() = viewModelScope.launch(Dispatchers.IO) {
+        if (mediaType.value != PlaybackMediaType.SONG) return@launch
+
         val userId = currentUserIdOrEmail()
         if (userId.isBlank()) {
             _actionMessage.value = "Login required"
@@ -317,16 +458,30 @@ class PlayerViewModel @Inject constructor(
         }
         val trackId = currentSongId.value
         if (trackId.isBlank()) return@launch
-        val nextState = !likeState.value
-        val flow = when (mediaType.value) {
-            PlaybackMediaType.SONG -> repository.provideLikeDislikeSong(userId, nextState, trackId)
-            PlaybackMediaType.RADIO -> repository.provideLikeDislikeRadio(userId, nextState, trackId)
-            PlaybackMediaType.PODCAST -> repository.provideLikeDislikePodcast(userId, nextState, trackId)
+
+        toggleSongLikeInternal(userId, trackId, likedSongIds.value.contains(trackId))
+    }
+
+    fun toggleSongLike(songId: String) = viewModelScope.launch(Dispatchers.IO) {
+        val userId = currentUserIdOrEmail()
+        if (userId.isBlank()) {
+            _actionMessage.value = "Login required"
+            return@launch
         }
-        flow.collect { result ->
+        if (songId.isBlank()) return@launch
+
+        toggleSongLikeInternal(userId, songId, likedSongIds.value.contains(songId))
+    }
+
+    private suspend fun toggleSongLikeInternal(userId: String, songId: String, currentlyLiked: Boolean) {
+        val nextState = !currentlyLiked
+        repository.provideLikeDislikeSong(userId, nextState, songId).collect { result ->
             when (result) {
                 is Response.Success -> {
-                    updateLikeState(nextState)
+                    repository.updateCachedSongLike(userId, songId, nextState)
+                    if (currentSongId.value == songId) {
+                        updateLikeState(nextState)
+                    }
                     _actionMessage.value = if (nextState) "Added to favorites" else "Removed from favorites"
                 }
                 is Response.Error -> _actionMessage.value = "Favorite update failed"
@@ -377,6 +532,7 @@ class PlayerViewModel @Inject constructor(
         album: String = ""
     ) {
         currentSongState.updateSongState(coverUri, title, singer, playingState, songId, songIndex, album)
+        syncCurrentSongLikeState()
     }
 
     fun updateShuffleState(shuffleState: Boolean) {

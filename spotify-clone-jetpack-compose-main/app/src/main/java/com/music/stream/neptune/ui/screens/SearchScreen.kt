@@ -63,6 +63,8 @@ import com.music.stream.neptune.data.preferences.isSongLiked
 import com.music.stream.neptune.data.preferences.removeLikedSongId
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.Loader
+import com.music.stream.neptune.ui.components.UnavailableAudioBadge
+import com.music.stream.neptune.ui.components.unavailableArtworkColorFilter
 import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
@@ -256,8 +258,7 @@ fun SumUpSearchScreen(
                                             SearchSongMiniRow(
                                                 card = song,
                                                 searchViewModel = searchViewModel,
-                                                context = context,
-                                                navController = navController
+                                                context = context
                                             )
                                         }
                                     }
@@ -340,19 +341,28 @@ fun TopResultCard(
     context: android.content.Context,
     modifier: Modifier = Modifier
 ) {
+    val isPlayableSong = card.type != "songs" || card.hasPlayableAudio
+
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .background(Color(0xFF1E1E1E))
             .clickable(
+                enabled = isPlayableSong,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
                 when (card.type) {
                     "album" -> navController.navigate("${Routes.Album.route}/${card.id}")
                     "artist" -> navController.navigate("${Routes.Artist.route}/${card.id}")
-                    "songs" -> if (card.play_url.isNotEmpty()) {
-                        SongPlayer.playSong(card.play_url, context)
+                    "songs" -> if (card.hasPlayableAudio) {
+                        SongPlayer.playSong(
+                            SongPlayer.buildSongStreamUrl(card.s3link),
+                            context,
+                            card.name,
+                            card.artist,
+                            card.image
+                        )
                         searchViewModel.updateSongState(
                             coverUri = card.image, title = card.name,
                             singer = card.artist, playingState = true, songId = card.id
@@ -371,16 +381,22 @@ fun TopResultCard(
                 letterSpacing = 0.5.sp
             )
             Spacer(Modifier.height(10.dp))
-            GlideImage(
-                modifier = Modifier
-                    .size(90.dp)
-                    .clip(if (card.type == "artist") CircleShape else RoundedCornerShape(8.dp)),
-                model = card.image,
-                contentScale = ContentScale.Crop,
-                loading = placeholder(R.drawable.placeholder),
-                failure = placeholder(R.drawable.placeholder),
-                contentDescription = card.name
-            )
+            Box {
+                GlideImage(
+                    modifier = Modifier
+                        .size(90.dp)
+                        .clip(if (card.type == "artist") CircleShape else RoundedCornerShape(8.dp)),
+                    model = card.image,
+                    contentScale = ContentScale.Crop,
+                    colorFilter = unavailableArtworkColorFilter(isPlayableSong),
+                    loading = placeholder(R.drawable.placeholder),
+                    failure = placeholder(R.drawable.placeholder),
+                    contentDescription = card.name
+                )
+                if (card.type == "songs" && !card.hasPlayableAudio) {
+                    UnavailableAudioBadge(modifier = Modifier.align(Alignment.Center))
+                }
+            }
             Spacer(Modifier.height(10.dp))
             Text(
                 text = card.name,
@@ -419,6 +435,16 @@ fun TopResultCard(
                     )
                 }
             }
+            if (card.type == "songs" && !card.hasPlayableAudio) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Audio unavailable",
+                    color = Color(0xFFBDBDBD),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -430,20 +456,28 @@ fun TopResultCard(
 fun SearchSongMiniRow(
     card: SearchCardModel,
     searchViewModel: SearchViewModel,
-    context: android.content.Context,
-    navController: NavController
+    context: android.content.Context
 ) {
+    val isPlayable = card.hasPlayableAudio
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(6.dp))
             .clickable(
+                enabled = isPlayable,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
-                if (card.play_url.isNotEmpty()) {
-                    SongPlayer.playSong(card.play_url, context)
+                if (isPlayable) {
+                    SongPlayer.playSong(
+                        SongPlayer.buildSongStreamUrl(card.s3link),
+                        context,
+                        card.name,
+                        card.artist,
+                        card.image
+                    )
                     searchViewModel.updateSongState(
                         coverUri = card.image, title = card.name,
                         singer = card.artist, playingState = true, songId = card.id
@@ -452,16 +486,22 @@ fun SearchSongMiniRow(
             }
             .padding(4.dp)
     ) {
-        GlideImage(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(4.dp)),
-            model = card.image,
-            contentScale = ContentScale.Crop,
-            loading = placeholder(R.drawable.placeholder),
-            failure = placeholder(R.drawable.placeholder),
-            contentDescription = ""
-        )
+        Box {
+            GlideImage(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                model = card.image,
+                contentScale = ContentScale.Crop,
+                colorFilter = unavailableArtworkColorFilter(isPlayable),
+                loading = placeholder(R.drawable.placeholder),
+                failure = placeholder(R.drawable.placeholder),
+                contentDescription = ""
+            )
+            if (!isPlayable) {
+                UnavailableAudioBadge(modifier = Modifier.align(Alignment.Center))
+            }
+        }
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -479,6 +519,15 @@ fun SearchSongMiniRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            if (!isPlayable) {
+                Text(
+                    text = "Audio unavailable",
+                    color = Color(0xFFBDBDBD),
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }
@@ -588,6 +637,8 @@ fun SearchCardRow(
     searchViewModel: SearchViewModel,
     context: android.content.Context
 ) {
+    val isPlayableSong = card.type != "songs" || card.hasPlayableAudio
+
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -595,14 +646,21 @@ fun SearchCardRow(
             .fillMaxWidth()
             .padding(16.dp, 6.dp)
             .clickable(
+                enabled = isPlayableSong,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
                 when (card.type) {
                     "album" -> navController.navigate("${Routes.Album.route}/${card.id}")
                     "artist" -> navController.navigate("${Routes.Artist.route}/${card.id}")
-                    "songs" -> if (card.play_url.isNotEmpty()) {
-                        SongPlayer.playSong(card.play_url, context)
+                    "songs" -> if (card.hasPlayableAudio) {
+                        SongPlayer.playSong(
+                            SongPlayer.buildSongStreamUrl(card.s3link),
+                            context,
+                            card.name,
+                            card.artist,
+                            card.image
+                        )
                         searchViewModel.updateSongState(
                             coverUri = card.image, title = card.name,
                             singer = card.artist, playingState = true, songId = card.id
@@ -615,17 +673,22 @@ fun SearchCardRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
         ) {
-            GlideImage(
-                modifier = Modifier
-                    .padding(end = 10.dp)
-                    .size(48.dp)
-                    .clip(if (card.type == "artist") CircleShape else RoundedCornerShape(6.dp)),
-                model = card.image,
-                contentScale = ContentScale.Crop,
-                failure = placeholder(R.drawable.placeholder),
-                loading = placeholder(R.drawable.placeholder),
-                contentDescription = ""
-            )
+            Box(modifier = Modifier.padding(end = 10.dp)) {
+                GlideImage(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(if (card.type == "artist") CircleShape else RoundedCornerShape(6.dp)),
+                    model = card.image,
+                    contentScale = ContentScale.Crop,
+                    colorFilter = unavailableArtworkColorFilter(isPlayableSong),
+                    failure = placeholder(R.drawable.placeholder),
+                    loading = placeholder(R.drawable.placeholder),
+                    contentDescription = ""
+                )
+                if (card.type == "songs" && !card.hasPlayableAudio) {
+                    UnavailableAudioBadge(modifier = Modifier.align(Alignment.Center))
+                }
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = card.name,
@@ -646,6 +709,15 @@ fun SearchCardRow(
                     fontSize = 12.sp,
                     maxLines = 1
                 )
+                if (card.type == "songs" && !card.hasPlayableAudio) {
+                    Text(
+                        text = "Audio unavailable",
+                        color = Color(0xFFBDBDBD),
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
@@ -665,6 +737,7 @@ fun LocalSongRow(
     LaunchedEffect(likeState) { isLiked = isSongLiked(context, song.id) }
 
     val isPlaying = song.id == searchViewModel.currentSongId.value
+    val isPlayable = song.hasPlayableAudio
     val textColor = if (isPlaying) Color(AppPalette.toArgb()) else Color.White
 
     Row(
@@ -674,10 +747,11 @@ fun LocalSongRow(
             .fillMaxWidth()
             .padding(16.dp, 8.dp)
             .clickable(
+                enabled = isPlayable,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
-                SongPlayer.playSong(song.url, context)
+                SongPlayer.playSong(song, context)
                 searchViewModel.updateSongState(song.thumbnail, song.name, song.singer, true, song.id)
             }
     ) {
@@ -685,17 +759,22 @@ fun LocalSongRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
         ) {
-            GlideImage(
-                modifier = Modifier
-                    .padding(end = 10.dp)
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(6.dp)),
-                model = song.thumbnail,
-                contentScale = ContentScale.Crop,
-                failure = placeholder(R.drawable.placeholder),
-                loading = placeholder(R.drawable.placeholder),
-                contentDescription = ""
-            )
+            Box(modifier = Modifier.padding(end = 10.dp)) {
+                GlideImage(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(6.dp)),
+                    model = song.thumbnail,
+                    contentScale = ContentScale.Crop,
+                    colorFilter = unavailableArtworkColorFilter(isPlayable),
+                    failure = placeholder(R.drawable.placeholder),
+                    loading = placeholder(R.drawable.placeholder),
+                    contentDescription = ""
+                )
+                if (!isPlayable) {
+                    UnavailableAudioBadge(modifier = Modifier.align(Alignment.Center))
+                }
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = song.name,
@@ -706,6 +785,15 @@ fun LocalSongRow(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(text = song.singer, color = Color.Gray, fontSize = 12.sp, maxLines = 1)
+                if (!isPlayable) {
+                    Text(
+                        text = "Audio unavailable",
+                        color = Color(0xFFBDBDBD),
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
         Icon(

@@ -70,12 +70,12 @@ fun MusicPlayerController(
 
             )
             Text(
-                text = "Song Name",
+                text = songName,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Singer name",
+                text = artistName,
                 fontSize = 14.sp,
             )
 
@@ -197,7 +197,7 @@ fun NotificationPlayer(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
-                    //playerViewModel.playPreviousSong(queueSongs, context)
+                    onPreviousClick()
                 }
             ,
             tint = Color.Black,
@@ -207,6 +207,12 @@ fun NotificationPlayer(
         Icon(
             modifier = Modifier
                 .size(35.dp)
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    onPlayPauseClick()
+                }
 
             ,
             tint = Color.Black,
@@ -224,7 +230,7 @@ fun NotificationPlayer(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
                 ) {
-                    //playerViewModel.playNextSongs(queueSongs, context)
+                    onNextClick()
                 }
             ,
             tint = Color.Black,

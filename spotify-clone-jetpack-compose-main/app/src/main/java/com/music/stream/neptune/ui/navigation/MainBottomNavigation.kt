@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Podcasts
+import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -54,7 +56,8 @@ fun MainBottomNavigation(
     val navItems = listOf(
         Routes.Home,
         Routes.Search,
-        Routes.Library
+        Routes.Radio,
+        Routes.Podcast
     )
     AnimatedVisibility(
         visible = bottomBarState.value,
@@ -95,10 +98,20 @@ fun MainBottomNavigation(
                             NavigationBarItem(
                                 selected = currentRoute == item.route,
                                 icon = {
-                                    Icon(
-                                        painter = painterResource(id = item.icon),
-                                        contentDescription = item.label
-                                    )
+                                    when (item) {
+                                        Routes.Radio -> Icon(
+                                            imageVector = Icons.Default.Radio,
+                                            contentDescription = item.label
+                                        )
+                                        Routes.Podcast -> Icon(
+                                            imageVector = Icons.Default.Podcasts,
+                                            contentDescription = item.label
+                                        )
+                                        else -> Icon(
+                                            painter = painterResource(id = item.icon),
+                                            contentDescription = item.label
+                                        )
+                                    }
                                 },
                                 label = {
                                     if (currentRoute == item.route) {

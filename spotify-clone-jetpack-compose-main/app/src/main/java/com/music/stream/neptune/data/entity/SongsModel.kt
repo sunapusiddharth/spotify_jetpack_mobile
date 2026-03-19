@@ -31,6 +31,7 @@ data class SongsModel(
     val title: String get() = name
     val singer: String get() = artists.firstOrNull()?.title ?: ""
     val coverUri: String get() = thumbnail
+    val hasPlayableAudio: Boolean get() = s3link.isNotBlank()
     // Use s3link as primary play URL, fall back to preview_url
     val url: String get() = if (s3link.isNotEmpty()) s3link else preview_url
 }

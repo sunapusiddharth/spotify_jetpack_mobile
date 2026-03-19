@@ -3,6 +3,7 @@ package com.music.stream.neptune.ui.screens
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,11 +18,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +43,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -54,10 +59,9 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.AlbumsModel
 import com.music.stream.neptune.data.entity.SongsModel
-import com.music.stream.neptune.data.preferences.getLikedSongIds
-import com.music.stream.neptune.data.preferences.toggleLikedSong
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.Loader
+import com.music.stream.neptune.ui.components.UnavailableAudioBadge
 import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
@@ -72,7 +76,7 @@ fun PlaylistScreen(navController: NavController, playlistId: String) {
     val context = LocalContext.current
 
     LaunchedEffect(playlistId) {
-        viewModel.loadPlaylist(playlistId)
+        viewModel.loadPlaylistCollection(playlistId)
     }
 
     val bgColor = Color(AppBackground.toArgb())
@@ -87,9 +91,8 @@ fun PlaylistScreen(navController: NavController, playlistId: String) {
             is Response.Success -> {
                 val playlist = (albumState as Response.Success).data
                 if (playlist != null) {
-                    PlaylistContent(
+                    PlaylistCollectionContent(
                         playlist = playlist,
-                        isCollection = false,
                         navController = navController,
                         viewModel = viewModel,
                         context = context
@@ -105,7 +108,6 @@ fun PlaylistScreen(navController: NavController, playlistId: String) {
                     Text("Failed to load playlist", color = Color.White)
                 }
             }
-            else -> {}
         }
 
         // Back button
@@ -119,7 +121,7 @@ fun PlaylistScreen(navController: NavController, playlistId: String) {
                 .background(Color.Black.copy(alpha = 0.4f))
         ) {
             Icon(
-                imageVector = Icons.Default.ArrowBack,
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
                 tint = Color.White
             )
@@ -150,9 +152,8 @@ fun PlaylistCollectionScreen(navController: NavController, collectionId: String)
             is Response.Success -> {
                 val collection = (albumState as Response.Success).data
                 if (collection != null) {
-                    PlaylistContent(
+                    PlaylistCollectionContent(
                         playlist = collection,
-                        isCollection = true,
                         navController = navController,
                         viewModel = viewModel,
                         context = context
@@ -168,7 +169,6 @@ fun PlaylistCollectionScreen(navController: NavController, collectionId: String)
                     Text("Failed to load collection", color = Color.White)
                 }
             }
-            else -> {}
         }
 
         // Back button
@@ -182,7 +182,7 @@ fun PlaylistCollectionScreen(navController: NavController, collectionId: String)
                 .background(Color.Black.copy(alpha = 0.4f))
         ) {
             Icon(
-                imageVector = Icons.Default.ArrowBack,
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = "Back",
                 tint = Color.White
             )
@@ -192,9 +192,8 @@ fun PlaylistCollectionScreen(navController: NavController, collectionId: String)
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-private fun PlaylistContent(
+private fun PlaylistCollectionContent(
     playlist: AlbumsModel,
-    isCollection: Boolean,
     navController: NavController,
     viewModel: AlbumViewModel,
     context: Context
@@ -204,198 +203,157 @@ private fun PlaylistContent(
     val currentAlbum by viewModel.currentSongAlbum
     val paletteColor = Color(AppPalette.toArgb())
     val playerViewModel: PlayerViewModel = hiltViewModel()
+    val likedSongIds by playerViewModel.likedSongIds.collectAsState()
 
     val playlistSongs = playlist.songs
-    val isThisPlaying = playingState && currentAlbum == playlist.id.toString()
+    val playableSongs = playlistSongs.filter { it.hasPlayableAudio }
+    val isThisPlaying = playingState && currentAlbum == playlist.id
+    val artistNames = playlist.artists.map { it.name }.filter { it.isNotBlank() }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
+            .background(Color(AppBackground.toArgb()))
     ) {
-        // Hero header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(380.dp)
-        ) {
-            GlideImage(
-                model = playlist.image,
-                contentDescription = playlist.title,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            colorStops = arrayOf(
-                                0f to Color.Transparent,
-                                0.6f to Color.Black.copy(alpha = 0.4f),
-                                1f to Color(AppBackground.toArgb())
-                            )
-                        )
-                    )
-            )
-            // Labels
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(16.dp)
-            ) {
-                // Type badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(paletteColor.copy(alpha = 0.85f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = if (isCollection) "PLAYLIST COLLECTION" else "PLAYLIST",
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = playlist.title,
-                    color = Color.White,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                if (playlist.artists.isNotEmpty()) {
-                    Text(
-                        text = playlist.artists.take(3).joinToString(" • ") { it.name },
-                        color = Color.White.copy(alpha = 0.7f),
-                        fontSize = 13.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
+        PlaylistHeroHeader(
+            playlist = playlist,
+            paletteColor = paletteColor,
+            artistNames = artistNames,
+            navController = navController
+        )
 
-        // Metadata + Controls
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            color = Color(AppBackground.toArgb()),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column {
-                Text(
-                    text = "${playlistSongs.size} song${if (playlistSongs.size != 1) "s" else ""}",
-                    color = Color.Gray,
-                    fontSize = 13.sp
-                )
-                if (playlistSongs.isNotEmpty()) {
-                    val totalMs = playlistSongs.sumOf { it.duration }
-                    Text(
-                        text = formatPlaylistDuration(totalMs),
-                        color = Color.Gray,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Shuffle
-                IconButton(
-                    onClick = {
-                        if (playlistSongs.isNotEmpty()) {
-                            val shuffled = playlistSongs.shuffled()
-                            playerViewModel.playSongQueueFromPlaylist(
-                                queueSongs = shuffled,
-                                startIndex = 0,
-                                album = playlist.id.toString(),
-                                context = context
-                            )
-                        }
-                    },
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Row(
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF2A2A3A))
+                        .fillMaxWidth()
+                        .padding(top = 18.dp, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Shuffle,
-                        contentDescription = "Shuffle",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                // Play/Pause
-                IconButton(
-                    onClick = {
-                        if (playlistSongs.isNotEmpty()) {
-                            if (isThisPlaying) {
-                                SongPlayer.pause()
-                                viewModel.updateSongState(
-                                    coverUri = viewModel.currentSongCoverUri.value,
-                                    title = viewModel.currentSongTitle.value,
-                                    singer = viewModel.currentSongSinger.value,
-                                    playingState = false,
-                                    songId = currentSongId,
-                                    songIndex = viewModel.currentSongIndex.value,
-                                    album = playlist.id.toString()
-                                )
-                            } else {
-                                playerViewModel.playSongQueueFromPlaylist(
-                                    queueSongs = playlistSongs,
-                                    startIndex = 0,
-                                    album = playlist.id.toString(),
-                                    context = context
-                                )
-                            }
-                        }
-                    },
-                    modifier = Modifier
-                        .size(54.dp)
-                        .clip(CircleShape)
-                        .background(paletteColor)
-                ) {
-                    Icon(
-                        imageVector = if (isThisPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isThisPlaying) "Pause" else "Play",
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp)
-                    )
-                }
-            }
-        }
-
-        // Song list
-        if (playlistSongs.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("No songs in this playlist", color = Color.Gray)
-            }
-        } else {
-            playlistSongs.forEachIndexed { index, song ->
-                PlaylistSongRow(
-                    song = song,
-                    trackNumber = index + 1,
-                    isPlaying = currentSongId == song.id && playingState,
-                    paletteColor = paletteColor,
-                    context = context,
-                    onClick = {
-                        playerViewModel.playSongQueueFromPlaylist(
-                            queueSongs = playlistSongs,
-                            startIndex = index,
-                            album = playlist.id.toString(),
-                            context = context
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "${playlistSongs.size} tracks",
+                            color = Color.White,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
                         )
-                        navController.navigate(Routes.Player.route)
+                        Text(
+                            text = buildString {
+                                append(formatPlaylistDuration(playlistSongs.sumOf { it.duration }))
+                                if (playableSongs.size != playlistSongs.size) {
+                                    append(" • ")
+                                    append("${playableSongs.size} playable")
+                                }
+                            },
+                            color = Color.Gray,
+                            fontSize = 13.sp
+                        )
                     }
-                )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        IconButton(
+                            onClick = {
+                                if (playableSongs.isNotEmpty()) {
+                                    val shuffled = playableSongs.shuffled()
+                                    playerViewModel.playSongQueueFromPlaylist(
+                                        queueSongs = shuffled,
+                                        startIndex = 0,
+                                        album = playlist.id,
+                                        context = context
+                                    )
+                                }
+                            },
+                            enabled = playableSongs.isNotEmpty(),
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(if (playableSongs.isNotEmpty()) Color(0xFF20242C) else Color(0xFF16181D))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Shuffle,
+                                contentDescription = "Shuffle",
+                                tint = if (playableSongs.isNotEmpty()) Color.White else Color.Gray
+                            )
+                        }
+                        IconButton(
+                            onClick = {
+                                if (playableSongs.isNotEmpty()) {
+                                    if (isThisPlaying) {
+                                        SongPlayer.pause()
+                                        viewModel.updateSongState(
+                                            coverUri = viewModel.currentSongCoverUri.value,
+                                            title = viewModel.currentSongTitle.value,
+                                            singer = viewModel.currentSongSinger.value,
+                                            playingState = false,
+                                            songId = currentSongId,
+                                            songIndex = viewModel.currentSongIndex.value,
+                                            album = playlist.id
+                                        )
+                                    } else {
+                                        playerViewModel.playSongQueueFromPlaylist(
+                                            queueSongs = playableSongs,
+                                            startIndex = 0,
+                                            album = playlist.id,
+                                            context = context
+                                        )
+                                    }
+                                }
+                            },
+                            enabled = playableSongs.isNotEmpty(),
+                            modifier = Modifier
+                                .size(58.dp)
+                                .clip(CircleShape)
+                                .background(if (playableSongs.isNotEmpty()) paletteColor else Color(0xFF1B3A28))
+                        ) {
+                            Icon(
+                                imageVector = if (isThisPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (isThisPlaying) "Pause" else "Play",
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (playlistSongs.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 48.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No songs in this playlist", color = Color.Gray)
+                    }
+                } else {
+                    playlistSongs.forEachIndexed { index, song ->
+                        val playableQueue = playlistSongs.filter { it.hasPlayableAudio }
+                        val playableIndex = playableQueue.indexOfFirst { it.id == song.id }
+                        PlaylistSongRow(
+                            song = song,
+                            trackNumber = index + 1,
+                            isPlaying = currentSongId == song.id && playingState,
+                            isLiked = likedSongIds.contains(song.id),
+                            paletteColor = paletteColor,
+                            context = context,
+                            onToggleLike = { playerViewModel.toggleSongLike(song.id) },
+                            onClick = {
+                                if (song.hasPlayableAudio && playableIndex >= 0) {
+                                    playerViewModel.playSongQueueFromPlaylist(
+                                        queueSongs = playableQueue,
+                                        startIndex = playableIndex,
+                                        album = playlist.id,
+                                        context = context
+                                    )
+                                    navController.navigate(Routes.Player.route)
+                                }
+                            }
+                        )
+                    }
+                }
             }
         }
 
@@ -405,15 +363,120 @@ private fun PlaylistContent(
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
+private fun PlaylistHeroHeader(
+    playlist: AlbumsModel,
+    paletteColor: Color,
+    artistNames: List<String>,
+    navController: NavController
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(420.dp)
+    ) {
+        GlideImage(
+            model = playlist.image,
+            contentDescription = playlist.title,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.12f),
+                            Color.Black.copy(alpha = 0.35f),
+                            paletteColor.copy(alpha = 0.45f),
+                            Color(AppBackground.toArgb())
+                        )
+                    )
+                )
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(horizontal = 16.dp, vertical = 20.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color.White.copy(alpha = 0.18f))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text(
+                    text = "PLAYLIST COLLECTION",
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = playlist.title,
+                color = Color.White,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.ExtraBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                playlist.artists.filter { it.name.isNotBlank() }.forEach { artist ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(Color.Black.copy(alpha = 0.28f))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) {
+                                if (artist.id.isNotBlank()) {
+                                    navController.navigate("${Routes.Artist.route}/${artist.id}")
+                                }
+                            }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            text = artist.name,
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+            if (artistNames.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = artistNames.joinToString(" • "),
+                    color = Color.White.copy(alpha = 0.78f),
+                    fontSize = 13.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
 private fun PlaylistSongRow(
     song: SongsModel,
     trackNumber: Int,
     isPlaying: Boolean,
+    isLiked: Boolean,
     paletteColor: Color,
     context: Context,
+    onToggleLike: () -> Unit,
     onClick: () -> Unit
 ) {
-    val likedSongs = remember { getLikedSongIds(context).toMutableSet() }
+    val isPlayable = song.hasPlayableAudio
 
     Row(
         modifier = Modifier
@@ -422,6 +485,7 @@ private fun PlaylistSongRow(
             .clip(RoundedCornerShape(8.dp))
             .background(if (isPlaying) paletteColor.copy(alpha = 0.15f) else Color.Transparent)
             .clickable(
+                enabled = isPlayable,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = onClick
@@ -450,6 +514,7 @@ private fun PlaylistSongRow(
                 model = song.thumbnail,
                 contentDescription = song.name,
                 contentScale = ContentScale.Crop,
+                colorFilter = if (isPlayable) null else ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }),
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(6.dp))
@@ -464,6 +529,9 @@ private fun PlaylistSongRow(
                 ) {
                     Text("▶", color = paletteColor, fontSize = 14.sp)
                 }
+            }
+            if (!isPlayable) {
+                UnavailableAudioBadge(modifier = Modifier.align(Alignment.Center))
             }
         }
         Spacer(Modifier.width(10.dp))
@@ -483,17 +551,26 @@ private fun PlaylistSongRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            if (!isPlayable) {
+                Text(
+                    text = "Audio unavailable",
+                    color = Color(0xFFBDBDBD),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         // Like button
         IconButton(
-            onClick = { toggleLikedSong(context, song.id) },
+            onClick = onToggleLike,
             modifier = Modifier.size(32.dp)
         ) {
             Icon(
-                imageVector = if (likedSongs.contains(song.id)) Icons.Default.Favorite
+                imageVector = if (isLiked) Icons.Default.Favorite
                 else Icons.Default.FavoriteBorder,
                 contentDescription = "Like",
-                tint = if (likedSongs.contains(song.id)) Color(0xFF1DB954) else Color.Gray,
+                tint = if (isLiked) Color.Red else Color.Gray,
                 modifier = Modifier.size(16.dp)
             )
         }
@@ -510,6 +587,7 @@ private fun PlaylistSongRow(
 private fun formatPlaylistDuration(totalMs: Int): String {
     val totalMinutes = totalMs / 60000
     return when {
+        totalMinutes <= 0 -> "0 min"
         totalMinutes < 60 -> "$totalMinutes min"
         else -> "${totalMinutes / 60}h ${totalMinutes % 60}m"
     }

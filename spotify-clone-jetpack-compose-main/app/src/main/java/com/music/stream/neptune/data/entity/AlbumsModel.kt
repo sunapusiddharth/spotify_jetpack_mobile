@@ -1,7 +1,7 @@
 package com.music.stream.neptune.data.entity
 
 data class AlbumsModel(
-    val id: Int = 0,
+    val id: String = "",
     val image: String = "",
     val title: String = "",
     val artists: List<PlaylistArtistRef> = emptyList(),

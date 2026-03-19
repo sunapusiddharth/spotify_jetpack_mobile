@@ -32,3 +32,8 @@ AUTH0_CLIENT_ID is your Auth0 Application Client ID (this is what you called acc
 
 Also set callback URL in Auth0 dashboard:
 com.music.stream.neptune.auth0://<AUTH0_DOMAIN>/android/com.music.stream.neptune/callback
+
+
+
+logging local
+adb logcat --pid=$(adb shell pidof -s com.music.stream.neptune)

@@ -19,19 +19,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,6 +45,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -58,18 +61,36 @@ import com.music.stream.neptune.R
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.AlbumsModel
 import com.music.stream.neptune.data.entity.ArtistsModel
+import com.music.stream.neptune.data.entity.HomePageCardModel
+import com.music.stream.neptune.data.entity.HomePageSectionModel
+import com.music.stream.neptune.data.entity.PodcastModel
+import com.music.stream.neptune.data.entity.RadioStationModel
+import com.music.stream.neptune.data.entity.SongsModel
+import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.Loader
+import com.music.stream.neptune.ui.components.UnavailableAudioBadge
+import com.music.stream.neptune.ui.components.unavailableArtworkColorFilter
 import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.GridBackground
 import com.music.stream.neptune.ui.viewmodel.HomeViewModel
+import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(navController: NavController) {
     val homeViewModel: HomeViewModel = hiltViewModel()
-    val albums by homeViewModel.albums.collectAsState()
+    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val homePage by homeViewModel.homePage.collectAsState()
+    val isLoadingNextHomePage by homeViewModel.isLoadingNextHomePage.collectAsState()
+    val hasMoreHomePages by homeViewModel.hasMoreHomePages.collectAsState()
     val artists by homeViewModel.artists.collectAsState()
+    val topStations by homeViewModel.topStations.collectAsState()
+    val editorsPlayList by homeViewModel.editorsPlayList.collectAsState()
+    val topScoringSongs by homeViewModel.topScoringSongs.collectAsState()
+    val topPodcasts by homeViewModel.topPodcasts.collectAsState()
+
+    val listState = rememberLazyListState()
 
     Surface(
         modifier = Modifier
@@ -77,22 +98,71 @@ fun HomeScreen(navController: NavController) {
             .background(Color(AppBackground.toArgb()))
             .statusBarsPadding()
     ) {
-        when (albums) {
-            is Response.Loading -> {
-                Log.d("homeMain", "loading...")
+        val homeSections = (homePage as? Response.Success)?.data?.results.orEmpty()
+        val artistsResponse = (artists as? Response.Success)?.data.orEmpty()
+        val stationsResponse = (topStations as? Response.Success)?.data.orEmpty()
+        val editorsSection = (editorsPlayList as? Response.Success)?.data
+        val topSongsResponse = (topScoringSongs as? Response.Success)?.data.orEmpty()
+        val podcastsResponse = (topPodcasts as? Response.Success)?.data.orEmpty()
+        val shouldLoadMore by remember(listState, hasMoreHomePages, isLoadingNextHomePage, homeSections) {
+            derivedStateOf {
+                val totalItemsCount = listState.layoutInfo.totalItemsCount
+                val lastVisibleItem = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                homeSections.isNotEmpty() &&
+                    hasMoreHomePages &&
+                    !isLoadingNextHomePage &&
+                    totalItemsCount > 0 &&
+                    lastVisibleItem >= totalItemsCount - 3
+            }
+        }
+
+        LaunchedEffect(shouldLoadMore) {
+            if (shouldLoadMore) {
+                homeViewModel.loadNextHomePage()
+            }
+        }
+
+        val isLoading = homePage is Response.Loading &&
+            artists is Response.Loading &&
+            topStations is Response.Loading &&
+            editorsPlayList is Response.Loading &&
+            topScoringSongs is Response.Loading &&
+            topPodcasts is Response.Loading
+
+        val hasAnyContent = homeSections.isNotEmpty() ||
+            artistsResponse.isNotEmpty() ||
+            stationsResponse.isNotEmpty() ||
+            editorsSection?.cards?.isNotEmpty() == true ||
+            topSongsResponse.isNotEmpty() ||
+            podcastsResponse.isNotEmpty()
+
+        when {
+            isLoading -> {
+                Log.d("homeMain", "loading real home feed...")
                 Loader()
             }
-            is Response.Success -> {
-                val albumsResponse = (albums as Response.Success).data
-                val artistsResponse = when (artists) {
-                    is Response.Success -> (artists as Response.Success).data
-                    else -> emptyList()
-                }
-                Log.d("homeMain", "Success. albums=${albumsResponse.size} artists=${artistsResponse.size}")
-                SumUpHomeScreen(navController = navController, albums = albumsResponse, artists = artistsResponse)
+            hasAnyContent -> {
+                SumUpHomeScreen(
+                    navController = navController,
+                    playerViewModel = playerViewModel,
+                    listState = listState,
+                    homeSections = homeSections,
+                    artists = artistsResponse,
+                    topStations = stationsResponse,
+                    editorsPlayList = editorsSection,
+                    topScoringSongs = topSongsResponse,
+                    topPodcasts = podcastsResponse,
+                    isLoadingNextHomePage = isLoadingNextHomePage
+                )
             }
-            is Response.Error -> {
-                Log.d("homeMain", "Error!! ${(albums as Response.Error).error}")
+            else -> {
+                val error = (homePage as? Response.Error)?.error
+                    ?: (artists as? Response.Error)?.error
+                    ?: (topStations as? Response.Error)?.error
+                    ?: (editorsPlayList as? Response.Error)?.error
+                    ?: (topScoringSongs as? Response.Error)?.error
+                    ?: (topPodcasts as? Response.Error)?.error
+                Log.d("homeMain", "Error!! $error")
                 Box(
                     modifier = Modifier.fillMaxSize().background(Color(AppBackground.toArgb())),
                     contentAlignment = Alignment.Center
@@ -107,26 +177,71 @@ fun HomeScreen(navController: NavController) {
 @Composable
 fun SumUpHomeScreen(
     navController: NavController,
-    albums: List<AlbumsModel>,
-    artists: List<ArtistsModel>
+    playerViewModel: PlayerViewModel,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    homeSections: List<HomePageSectionModel>,
+    artists: List<ArtistsModel>,
+    topStations: List<RadioStationModel>,
+    editorsPlayList: HomePageSectionModel?,
+    topScoringSongs: List<SongsModel>,
+    topPodcasts: List<PodcastModel>,
+    isLoadingNextHomePage: Boolean
 ) {
-    Column(
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .background(Color(AppBackground.toArgb()))
+            .background(Color(AppBackground.toArgb())),
+        state = listState
     ) {
-        // Featured hero carousel
-        if (albums.isNotEmpty()) {
-            FeaturedBanner(albums = albums, navController = navController)
+        item {
+            GreetingSection()
         }
-        GreetingSection()
-        if (albums.size >= 8) {
-            HomePlaylistGrid(navController, albums)
+
+        item {
+            HomeArtists(artists = artists, navController)
         }
-        HomeAlbums(album = albums, navController)
-        HomeArtists(artists = artists, navController)
-        ImageCard(navController, albums)
+
+        item {
+            HomePodcastsSection(navController = navController, podcasts = topPodcasts)
+        }
+
+        if (editorsPlayList?.cards?.isNotEmpty() == true) {
+            item(key = "editors_playlist") {
+                HomeCardSection(navController = navController, section = editorsPlayList, playerViewModel = playerViewModel)
+            }
+        }
+
+        items(
+            items = homeSections.filter { it.cards.isNotEmpty() },
+            key = { section -> "home_section_${section.id.ifBlank { section.label + section.path }}" }
+        ) { section ->
+            HomeCardSection(navController = navController, section = section, playerViewModel = playerViewModel)
+        }
+
+        item {
+            HomeSongsSection(songs = topScoringSongs, playerViewModel = playerViewModel)
+        }
+
+        item {
+            HomeStationsSection(navController = navController, stations = topStations)
+        }
+
+        if (isLoadingNextHomePage) {
+            item(key = "home_paging_loader") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Loader()
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(120.dp))
+        }
     }
 }
 
@@ -161,6 +276,335 @@ fun GreetingSection(name: String = "User") {
             )
         }
     }
+}
+
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+private fun HomeCardSection(navController: NavController, section: HomePageSectionModel, playerViewModel: PlayerViewModel) {
+    val context = LocalContext.current
+    val playableSongs = remember(section.cards) {
+        section.cards.mapNotNull { it.song }.filter { it.hasPlayableAudio }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp, 16.dp, 16.dp, 0.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = section.label.ifBlank { "Recommended" },
+            color = Color.White,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.clickable(
+                enabled = section.path.isNotBlank() || section.id.isNotBlank(),
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                navigateToHomeSection(navController, section)
+            }
+        )
+    }
+
+    LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
+        items(section.cards.size) { index ->
+            val card = section.cards[index]
+            val isPlayableSong = card.song?.hasPlayableAudio == true
+            Box(
+                modifier = Modifier
+                    .padding(10.dp)
+                    .width(150.dp)
+                    .clickable(
+                        enabled = isPlayableSong,
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        card.song?.let { song ->
+                            val startIndex = playableSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                            playerViewModel.startSongPlayback(
+                                queueSongs = playableSongs,
+                                startIndex = startIndex,
+                                album = section.label.ifBlank { section.id.ifBlank { "home" } },
+                                context = context
+                            )
+                        }
+                    }
+            ) {
+                Column {
+                    Box {
+                        GlideImage(
+                            modifier = Modifier
+                                .size(150.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop,
+                            model = card.image,
+                            colorFilter = unavailableArtworkColorFilter(isPlayableSong),
+                            loading = placeholder(R.drawable.placeholder),
+                            failure = placeholder(R.drawable.placeholder),
+                            contentDescription = card.title
+                        )
+                        if (!isPlayableSong) {
+                            UnavailableAudioBadge(modifier = Modifier.align(Alignment.Center))
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = card.title,
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (card.subtitle.isNotEmpty()) {
+                        Text(
+                            text = card.subtitle,
+                            color = Color.Gray,
+                            fontSize = 12.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (!isPlayableSong) {
+                        Text(
+                            text = "Audio unavailable",
+                            color = Color(0xFFBDBDBD),
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+private fun HomeSongsSection(songs: List<SongsModel>, playerViewModel: PlayerViewModel) {
+    if (songs.isEmpty()) return
+
+    val context = LocalContext.current
+    val playableSongs = remember(songs) { songs.filter { it.hasPlayableAudio } }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp, 16.dp, 16.dp, 0.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = "Top Tracks For You", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+    }
+
+    LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
+        items(songs.size) { index ->
+            val song = songs[index]
+            val isPlayable = song.hasPlayableAudio
+            Box(
+                modifier = Modifier
+                    .padding(10.dp)
+                    .width(155.dp)
+                    .clickable(
+                        enabled = isPlayable,
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        val startIndex = playableSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                        playerViewModel.startSongPlayback(
+                            queueSongs = playableSongs,
+                            startIndex = startIndex,
+                            album = "Top Tracks For You",
+                            context = context
+                        )
+                    }
+            ) {
+                Column {
+                    Box {
+                        GlideImage(
+                            modifier = Modifier
+                                .size(155.dp)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop,
+                            model = song.thumbnail,
+                            colorFilter = unavailableArtworkColorFilter(isPlayable),
+                            loading = placeholder(R.drawable.placeholder),
+                            failure = placeholder(R.drawable.placeholder),
+                            contentDescription = song.title
+                        )
+                        if (!isPlayable) {
+                            UnavailableAudioBadge(modifier = Modifier.align(Alignment.Center))
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(text = song.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(
+                        text = song.artists.joinToString(", ") { it.title },
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (!isPlayable) {
+                        Text(
+                            text = "Audio unavailable",
+                            color = Color(0xFFBDBDBD),
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+private fun HomeStationsSection(navController: NavController, stations: List<RadioStationModel>) {
+    if (stations.isEmpty()) return
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp, 16.dp, 16.dp, 0.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = "Top Stations", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+    }
+
+    LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
+        items(stations.size) { index ->
+            val station = stations[index]
+            Box(
+                modifier = Modifier
+                    .padding(10.dp)
+                    .width(150.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        navController.navigate(Routes.Radio.route)
+                    }
+            ) {
+                Column {
+                    GlideImage(
+                        modifier = Modifier
+                            .size(150.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop,
+                        model = station.coverUri,
+                        loading = placeholder(R.drawable.placeholder),
+                        failure = placeholder(R.drawable.placeholder),
+                        contentDescription = station.name
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(text = station.name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(text = station.country, color = Color.Gray, fontSize = 12.sp, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+private fun HomePodcastsSection(navController: NavController, podcasts: List<PodcastModel>) {
+    if (podcasts.isEmpty()) return
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(20.dp, 16.dp, 16.dp, 0.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = "Top Podcasts", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+    }
+
+    LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
+        items(podcasts.size) { index ->
+            val podcast = podcasts[index]
+            Box(
+                modifier = Modifier
+                    .padding(10.dp)
+                    .width(150.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) {
+                        navController.navigate("${Routes.PodcastDetail.route}/${podcast.id}")
+                    }
+            ) {
+                Column {
+                    GlideImage(
+                        modifier = Modifier
+                            .size(150.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop,
+                        model = podcast.image,
+                        loading = placeholder(R.drawable.placeholder),
+                        failure = placeholder(R.drawable.placeholder),
+                        contentDescription = podcast.title
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(text = podcast.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(text = podcast.author, color = Color.Gray, fontSize = 12.sp, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+private fun navigateToHomeCard(navController: NavController, card: HomePageCardModel) {
+    when {
+        card.path.startsWith("/artist") || card.type == "artists_card" -> {
+            navController.navigate("${Routes.Artist.route}/${card.id}")
+        }
+        card.path.startsWith("/podcast") -> {
+            navController.navigate("${Routes.PodcastDetail.route}/${card.id}")
+        }
+        card.path.contains("playlist/") -> {
+            navController.navigate("${Routes.Playlist.route}/${card.id}")
+        }
+        card.path.startsWith("/playlist_collection") || card.type == "playlist_card" -> {
+            navController.navigate("${Routes.Playlist.route}/${card.id}")
+        }
+        card.song?.album?.id?.isNotEmpty() == true -> {
+            navController.navigate("${Routes.Album.route}/${card.song.album.id}")
+        }
+        else -> {
+            navController.navigate("${Routes.Playlist.route}/${card.id}")
+        }
+    }
+}
+
+private fun navigateToHomeSection(navController: NavController, section: HomePageSectionModel) {
+    when {
+        section.path.contains("playlist/") -> {
+            navController.navigate("${Routes.Playlist.route}/${extractTrailingId(section.path, section.id)}")
+        }
+        section.path.startsWith("/playlist_collection") -> {
+            navController.navigate("${Routes.Playlist.route}/${extractTrailingId(section.path, section.id)}")
+        }
+        section.path.startsWith("/artist") -> {
+            navController.navigate("${Routes.Artist.route}/${extractTrailingId(section.path, section.id)}")
+        }
+        section.path.startsWith("/podcast") -> {
+            navController.navigate("${Routes.Podcast.route}")
+        }
+    }
+}
+
+private fun extractTrailingId(path: String, fallbackId: String): String {
+    val trimmed = path.trim().trimEnd('/')
+    val trailing = trimmed.substringAfterLast('/', "")
+    return trailing.ifBlank { fallbackId }
 }
 
 // ─── Featured Banner (Hero Carousel) ─────────────────────────────────────────

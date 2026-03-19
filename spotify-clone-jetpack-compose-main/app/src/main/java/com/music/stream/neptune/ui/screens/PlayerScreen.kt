@@ -27,10 +27,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LibraryAdd
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SliderColors
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -64,7 +68,6 @@ import com.bumptech.glide.integration.compose.placeholder
 import com.music.stream.neptune.R
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.SongsModel
-import com.music.stream.neptune.data.preferences.getLikedSongIds
 import com.music.stream.neptune.data.preferences.getSongsByIds
 import com.music.stream.neptune.di.PlaybackMediaType
 import com.music.stream.neptune.di.Palette
@@ -87,10 +90,12 @@ fun PlayerScreen(navController: NavController) {
     val songId = playerViewModel.currentSongId.value
     val mediaType = playerViewModel.mediaType.value
     val context = LocalContext.current
-    val isLiked = remember { mutableStateOf(playerViewModel.likeState.value) }
+    val likedSongIds by playerViewModel.likedSongIds.collectAsState()
     val actionMessage by playerViewModel.actionMessage.collectAsState()
     val userPlaylistsState by playerViewModel.userPlaylists.collectAsState()
     var showPlaylistPicker by remember { mutableStateOf(false) }
+    var selectedPlaylistIds by remember(songId) { mutableStateOf(setOf<String>()) }
+    var newPlaylistName by remember(songId) { mutableStateOf("") }
 
     var songProgress by remember { mutableStateOf(maxOf(0f, SongPlayer.getCurrentPosition().toFloat())) }
     var songDurationText by remember { mutableStateOf("0:00") }
@@ -100,8 +105,6 @@ fun PlayerScreen(navController: NavController) {
     else playerViewModel.formatDuration(SongPlayer.getDuration())
     songProgressText = if (SongPlayer.getCurrentPosition() < 0) "0:00"
     else playerViewModel.formatDuration(SongPlayer.getCurrentPosition())
-
-    Log.d("checkplayer", songTitle)
 
     var dominantColor by remember { mutableStateOf(Color(AppBackground.toArgb())) }
     Palette().extractSecondColorFromCoverUrl(context = context, songCoverUri) { color ->
@@ -121,7 +124,6 @@ fun PlayerScreen(navController: NavController) {
 
     when {
         playerViewModel.currentSongAlbum.value == "Liked Songs" -> {
-            val likedSongIds = getLikedSongIds(context)
             queueSongs = getSongsByIds(likedSongIds, songs).sortedBy { it.title }
         }
         playerViewModel.currentSongAlbum.value.isNotEmpty() -> {
@@ -150,8 +152,6 @@ fun PlayerScreen(navController: NavController) {
         if (mediaType == PlaybackMediaType.SONG) {
             playerViewModel.syncSongQueue(queueSongs, songId)
         }
-        isLiked.value = false
-        playerViewModel.updateLikeState(false)
     }
 
     LaunchedEffect(actionMessage) {
@@ -159,6 +159,15 @@ fun PlayerScreen(navController: NavController) {
             delay(1600)
             playerViewModel.clearActionMessage()
         }
+    }
+
+    LaunchedEffect(showPlaylistPicker, userPlaylistsState, songId) {
+        if (!showPlaylistPicker) return@LaunchedEffect
+        val playlists = (userPlaylistsState as? Response.Success)?.data ?: return@LaunchedEffect
+        selectedPlaylistIds = playlists
+            .filter { it.tracks.contains(songId) }
+            .map { it.id }
+            .toSet()
     }
 
     LaunchedEffect(key1 = songPlayingState) {
@@ -215,11 +224,9 @@ fun PlayerScreen(navController: NavController) {
                 PlayerInfo(
                     songTitle = songTitle,
                     songSinger = songSinger,
-                    isLiked = isLiked,
-                    onLike = {
-                        playerViewModel.toggleLikeCurrentMedia()
-                        isLiked.value = !isLiked.value
-                    }
+                    isLiked = likedSongIds.contains(songId),
+                    showLike = mediaType == PlaybackMediaType.SONG,
+                    onLike = { playerViewModel.toggleLikeCurrentMedia() }
                 )
 
                 CustomSlider(
@@ -264,29 +271,57 @@ fun PlayerScreen(navController: NavController) {
                     Text(text = songDurationText, color = Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                 }
 
-                PlayerFull(songPlayingState, playerViewModel, context, isLiked, shuffle, repeat)
+                PlayerFull(songPlayingState, playerViewModel, context, shuffle, repeat)
 
                 if (mediaType == PlaybackMediaType.SONG) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 20.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Button(
-                            onClick = {
-                                playerViewModel.loadUserPlaylists()
-                                showPlaylistPicker = true
-                            },
-                            modifier = Modifier.weight(1f)
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.10f))
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    playerViewModel.loadUserPlaylists()
+                                    showPlaylistPicker = true
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text("Add To Playlist", fontSize = 11.sp)
+                            Icon(
+                                imageVector = Icons.Default.LibraryAdd,
+                                contentDescription = "Add to playlist",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
-                        Button(
-                            onClick = { playerViewModel.requestCurrentTrackAddition() },
-                            modifier = Modifier.weight(1f)
+                        Spacer(Modifier.width(18.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(46.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.10f))
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    playerViewModel.requestCurrentTrackAddition()
+                                },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text("Request Track", fontSize = 11.sp)
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = "Request song",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                 }
@@ -351,28 +386,66 @@ fun PlayerScreen(navController: NavController) {
 
         if (showPlaylistPicker && mediaType == PlaybackMediaType.SONG) {
             AlertDialog(
-                onDismissRequest = { showPlaylistPicker = false },
-                title = { Text("Select Playlist") },
+                onDismissRequest = {
+                    showPlaylistPicker = false
+                    newPlaylistName = ""
+                },
+                title = { Text("Your Playlists") },
                 text = {
                     when (userPlaylistsState) {
                         is Response.Loading -> Text("Loading playlists...")
                         is Response.Success -> {
                             val playlists = (userPlaylistsState as Response.Success).data
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                OutlinedTextField(
+                                    value = newPlaylistName,
+                                    onValueChange = { newPlaylistName = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    label = { Text("New playlist name") }
+                                )
+                                Text(
+                                    text = "Choose existing playlists or create a new one.",
+                                    color = Color.Gray,
+                                    fontSize = 12.sp
+                                )
                                 if (playlists.isEmpty()) {
-                                    Text("No playlists found")
-                                } else {
-                                    playlists.forEach { playlist ->
-                                        Text(
-                                            text = playlist.name,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    playerViewModel.addCurrentSongToPlaylist(playlist.id)
-                                                    showPlaylistPicker = false
+                                    Text("No playlists found", color = Color.White)
+                                }
+                                playlists.forEach { playlist ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                selectedPlaylistIds = if (selectedPlaylistIds.contains(playlist.id)) {
+                                                    selectedPlaylistIds - playlist.id
+                                                } else {
+                                                    selectedPlaylistIds + playlist.id
                                                 }
-                                                .padding(vertical = 6.dp)
+                                            }
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Checkbox(
+                                            checked = selectedPlaylistIds.contains(playlist.id),
+                                            onCheckedChange = { checked ->
+                                                selectedPlaylistIds = if (checked) {
+                                                    selectedPlaylistIds + playlist.id
+                                                } else {
+                                                    selectedPlaylistIds - playlist.id
+                                                }
+                                            }
                                         )
+                                        Column {
+                                            Text(text = playlist.name)
+                                            if (playlist.tracks.contains(songId)) {
+                                                Text(
+                                                    text = "Already contains this song",
+                                                    color = Color.Gray,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -382,7 +455,19 @@ fun PlayerScreen(navController: NavController) {
                     }
                 },
                 confirmButton = {
-                    TextButton(onClick = { showPlaylistPicker = false }) {
+                    TextButton(onClick = {
+                        playerViewModel.saveCurrentSongToPlaylists(selectedPlaylistIds, newPlaylistName)
+                        showPlaylistPicker = false
+                        newPlaylistName = ""
+                    }) {
+                        Text("Save")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        showPlaylistPicker = false
+                        newPlaylistName = ""
+                    }) {
                         Text("Close")
                     }
                 }
@@ -492,7 +577,7 @@ fun QueueSheet(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
                                 ) {
-                                    SongPlayer.playSong(song.url, context)
+                                    SongPlayer.playSong(song, context)
                                     playerViewModel.updateSongState(
                                         song.thumbnail, song.name, song.singer,
                                         true, song.id, index, playerViewModel.currentSongAlbum.value
@@ -604,7 +689,8 @@ fun PlayerTopBar(navController: NavController) {
 fun PlayerInfo(
     songTitle: String,
     songSinger: String,
-    isLiked: MutableState<Boolean>,
+    isLiked: Boolean,
+    showLike: Boolean,
     onLike: () -> Unit
 ) {
     Row(
@@ -630,19 +716,18 @@ fun PlayerInfo(
                 maxLines = 1
             )
         }
-        Spacer(Modifier.width(12.dp))
-        Icon(
-            modifier = Modifier
-                .size(28.dp)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { onLike() },
-            painter = if (isLiked.value) painterResource(id = R.drawable.added)
-            else painterResource(id = R.drawable.ic_add),
-            tint = if (isLiked.value) Color(AppPalette.toArgb()) else Color.White,
-            contentDescription = "Like"
-        )
+        if (showLike) {
+            Spacer(Modifier.width(12.dp))
+            IconButton(onClick = onLike) {
+                Icon(
+                    painter = if (isLiked) painterResource(id = R.drawable.added)
+                    else painterResource(id = R.drawable.ic_add),
+                    tint = if (isLiked) Color.Red else Color.White,
+                    contentDescription = if (isLiked) "Unlike" else "Like",
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
     }
 }
 
@@ -653,7 +738,6 @@ fun PlayerFull(
     songPlayingState: Boolean,
     playerViewModel: PlayerViewModel,
     context: Context,
-    isLiked: MutableState<Boolean>,
     shuffle: Boolean,
     repeat: Boolean
 ) {

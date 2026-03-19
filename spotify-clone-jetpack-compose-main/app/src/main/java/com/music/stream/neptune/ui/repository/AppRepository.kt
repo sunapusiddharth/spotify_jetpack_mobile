@@ -1,12 +1,19 @@
 package com.music.stream.neptune.ui.repository
 
 import com.music.stream.neptune.data.api.Api
+import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class AppRepository @Inject constructor(private val api: Api) {
 
+    fun observeLikedSongIds(): StateFlow<Set<String>> = api.observeLikedSongIds()
+    fun clearCachedUserProfile() = api.clearCachedUser()
+    fun updateCachedSongLike(userId: String, trackId: String, liked: Boolean) = api.updateCachedSongLike(userId, trackId, liked)
+
+    suspend fun provideUserById(userId: String) = api.getUserById(userId)
+    suspend fun provideHomePage(userId: String, page: Int) = api.getHomePage(userId, page)
     suspend fun provideAlbums() = api.getAlbums()
     suspend fun provideArtists() = api.getArtists()
     suspend fun provideSongs() = api.getSongs()
@@ -15,6 +22,7 @@ class AppRepository @Inject constructor(private val api: Api) {
     suspend fun provideArtistSongs(id: String, page: Int) = api.getArtistSongs(id, page)
     suspend fun provideSearch(query: String, type: String, page: Int) = api.searchAll(query, type, page)
     suspend fun provideTopScoringSongs(limit: Int) = api.getTopScoringSongs(limit)
+    suspend fun provideTopScoringSongsForUser(userId: String, limit: Int) = api.getTopScoringSongsForUser(userId, limit)
     suspend fun provideAddPlaylistToQueue(userId: String, trackIds: List<String>) = api.addPlaylistToQueue(userId, trackIds)
     suspend fun provideNextQueueItem(userId: String) = api.getNextQueueItem(userId)
     suspend fun providePrevQueueItem(userId: String) = api.getPrevQueueItem(userId)
@@ -28,6 +36,7 @@ class AppRepository @Inject constructor(private val api: Api) {
 
     // Available tracks
     suspend fun provideAllSongs(page: Int, limit: Int) = api.getAllSongs(page, limit)
+    suspend fun provideAllAvailableSongs(skip: Int, limit: Int) = api.getAllAvailableSongs(skip, limit)
 
     // Podcast
     suspend fun provideBrowsePodcasts(page: Int) = api.browsePodcasts(page)
@@ -61,8 +70,11 @@ class AppRepository @Inject constructor(private val api: Api) {
     // Playlist / PlaylistCollection
     suspend fun providePlaylistById(id: String) = api.getPlaylistById(id)
     suspend fun providePlaylistCollectionById(id: String) = api.getPlaylistCollectionById(id)
+    suspend fun provideEditorsPlayList(limit: Int) = api.getEditorsPlayList(limit)
     suspend fun provideLatestPlaylistCollections() = api.getLatestPlaylistCollections()
     suspend fun provideUserPlaylists(userId: String) = api.getUserPlaylists(userId)
+    suspend fun provideCreateNewPlaylist(userId: String, name: String, image: String) =
+        api.createNewPlaylist(userId, name, image)
     suspend fun provideAddSongToPlaylist(userId: String, songId: String, playlistIds: List<String>, posterPath: String) =
         api.addSongToPlaylist(userId, songId, playlistIds, posterPath)
 }

@@ -89,7 +89,10 @@ fun AuthLoginScreen(
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "Sign in with Auth0 to continue your songs, stations, and podcasts.",
+                    text = if (state.bypassEnabled)
+                        "Auth bypass mode is enabled. The app will use the test user from gradle.properties."
+                    else
+                        "Sign in with Auth0 to continue your songs, stations, and podcasts.",
                     color = Color.White.copy(alpha = 0.78f),
                     textAlign = TextAlign.Center,
                     lineHeight = 20.sp
@@ -116,7 +119,11 @@ fun AuthLoginScreen(
                         enabled = !state.loading,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF39D98A))
                     ) {
-                        Text(if (state.loading) "Opening Auth0..." else "Continue With Auth0")
+                        Text(
+                            if (state.loading) "Opening Auth0..."
+                            else if (state.bypassEnabled) "Continue In Test Mode"
+                            else "Continue With Auth0"
+                        )
                     }
                 }
 

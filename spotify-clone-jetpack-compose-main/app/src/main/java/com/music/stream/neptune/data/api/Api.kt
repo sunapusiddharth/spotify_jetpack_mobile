@@ -3,6 +3,8 @@ package com.music.stream.neptune.data.api
 import android.util.Log
 import com.music.stream.neptune.data.entity.AlbumsModel
 import com.music.stream.neptune.data.entity.ArtistsModel
+import com.music.stream.neptune.data.entity.HomePageInfoModel
+import com.music.stream.neptune.data.entity.HomePageSectionModel
 import com.music.stream.neptune.data.entity.QueueUpdateModel
 import com.music.stream.neptune.data.entity.PodcastEpisodeModel
 import com.music.stream.neptune.data.entity.PodcastModel
@@ -11,28 +13,87 @@ import com.music.stream.neptune.data.entity.RadioGenreAggModel
 import com.music.stream.neptune.data.entity.RadioStationModel
 import com.music.stream.neptune.data.entity.SearchResultModel
 import com.music.stream.neptune.data.entity.SongsModel
+import com.music.stream.neptune.data.entity.UserModel
 import com.music.stream.neptune.data.entity.UserPlaylistModel
 import com.music.stream.neptune.data.entity.web.toDomain
+import com.music.stream.neptune.data.network.QueueSongResponse
 import com.music.stream.neptune.data.network.AddMultipleTracksRequest
 import com.music.stream.neptune.data.network.AddSongToPlaylistRequest
 import com.music.stream.neptune.data.network.ArtistSongsPaginationResponse
+import com.music.stream.neptune.data.network.CreatePlaylistRequest
 import com.music.stream.neptune.data.network.NetworkApi
 import com.music.stream.neptune.data.network.PodcastBrowseResponse
 import com.music.stream.neptune.data.network.PodcastEpisodesResponse
 import com.music.stream.neptune.data.network.SongsPageResponse
 import com.music.stream.neptune.data.network.StationsBrowseResponse
+import com.google.gson.Gson
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class Api @Inject constructor(private val networkApi: NetworkApi) {
+    private val gson = Gson()
 
     // In-memory caches to avoid repeated network calls
     private var cachedAlbums: List<AlbumsModel>? = null
     private var cachedArtists: List<ArtistsModel>? = null
     private var cachedSongs: List<SongsModel>? = null
+    private var cachedUser: UserModel? = null
+    private val likedSongIds = MutableStateFlow<Set<String>>(emptySet())
+
+    fun observeLikedSongIds(): StateFlow<Set<String>> = likedSongIds.asStateFlow()
+
+    fun clearCachedUser() {
+        cachedUser = null
+        likedSongIds.value = emptySet()
+    }
+
+    fun updateCachedSongLike(userId: String, trackId: String, liked: Boolean) {
+        if (userId.isBlank() || trackId.isBlank()) return
+
+        val nextIds = likedSongIds.value.toMutableSet().apply {
+            if (liked) add(trackId) else remove(trackId)
+        }
+        likedSongIds.value = nextIds
+
+        val existing = cachedUser
+        if (existing != null && existing.id == userId) {
+            cachedUser = existing.copy(likedSongs = nextIds.toList())
+        }
+    }
+
+    suspend fun getUserById(userId: String): Flow<Response<UserModel>> = flow {
+        emit(Response.Loading())
+        try {
+            if (userId.isBlank()) {
+                clearCachedUser()
+                emit(Response.Error("Login required"))
+                return@flow
+            }
+
+            val cached = cachedUser
+            if (cached != null && cached.id == userId) {
+                likedSongIds.value = cached.likedSongs.toSet()
+                emit(Response.Success(cached))
+                return@flow
+            }
+
+            val user = networkApi.getUserById(userId).toDomain()
+            cachedUser = user
+            likedSongIds.value = user.likedSongs.toSet()
+            emit(Response.Success(user))
+        } catch (e: Exception) {
+            Log.e("Api", "Error fetching user $userId: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
 
     suspend fun getAlbums(): Flow<Response<List<AlbumsModel>>> = flow {
         emit(Response.Loading())
@@ -70,6 +131,52 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
+    suspend fun getHomePage(userId: String, page: Int): Flow<Response<HomePageInfoModel>> = flow {
+        emit(Response.Loading())
+        try {
+            if (userId.isBlank()) {
+                emit(Response.Success(HomePageInfoModel(page = page)))
+                return@flow
+            }
+            val result = networkApi.getHomePage(userId, page)
+            val sections = parseHomeSections(result.get("results"))
+            emit(
+                Response.Success(
+                    HomePageInfoModel(
+                        results = sections.map { it.toDomain() },
+                        page = result.get("page")?.takeIf { !it.isJsonNull }?.asInt ?: page
+                    )
+                )
+            )
+        } catch (e: Exception) {
+            Log.e("Api", "Error fetching home page for $userId: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    private fun parseHomeSections(element: JsonElement?): List<com.music.stream.neptune.data.entity.web.WebHomePageDataType> {
+        if (element == null || element.isJsonNull) return emptyList()
+
+        return when {
+            element.isJsonArray -> element.asJsonArray.flatMap { parseHomeSections(it) }
+            element.isJsonObject -> parseHomeSectionObject(element.asJsonObject)?.let(::listOf).orEmpty()
+            else -> emptyList()
+        }
+    }
+
+    private fun parseHomeSectionObject(element: JsonObject): com.music.stream.neptune.data.entity.web.WebHomePageDataType? {
+        if (element.entrySet().isEmpty()) return null
+
+        val section = gson.fromJson(element, com.music.stream.neptune.data.entity.web.WebHomePageDataType::class.java)
+        val hasMeaningfulData = section.cardType.isNotBlank() ||
+            section.label.isNotBlank() ||
+            section.path.isNotBlank() ||
+            section.id.isNotBlank() ||
+            section.cards.isNotEmpty()
+
+        return section.takeIf { hasMeaningfulData }
+    }
+
     suspend fun getSongs(): Flow<Response<List<SongsModel>>> = flow {
         emit(Response.Loading())
         try {
@@ -94,7 +201,7 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         emit(Response.Loading())
         try {
             // Try cache first
-            val fromCache = cachedAlbums?.find { it.id.toString() == id }
+            val fromCache = cachedAlbums?.find { it.id == id }
             if (fromCache != null) {
                 emit(Response.Success(fromCache))
                 return@flow
@@ -155,6 +262,21 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
+    suspend fun getTopScoringSongsForUser(userId: String, limit: Int): Flow<Response<List<SongsModel>>> = flow {
+        emit(Response.Loading())
+        try {
+            if (userId.isBlank()) {
+                emit(Response.Success(emptyList()))
+                return@flow
+            }
+            val result = networkApi.getTopScoringSongsForUser(userId, limit).map { it.toDomain() }
+            emit(Response.Success(result))
+        } catch (e: Exception) {
+            Log.e("Api", "Error fetching user top scoring songs: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
     // ── Available tracks ──────────────────────────────────────────────────────
     suspend fun getAllSongs(page: Int, limit: Int): Flow<Response<SongsPageResponse>> = flow {
         emit(Response.Loading())
@@ -172,11 +294,31 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
+    suspend fun getAllAvailableSongs(skip: Int, limit: Int): Flow<Response<SongsPageResponse>> = flow {
+        emit(Response.Loading())
+        try {
+            val result = networkApi.getAllAvailableSongs(skip, limit)
+            val mapped = SongsPageResponse(
+                results = result.results.map { it.toDomain() },
+                page = result.page,
+                total = if (result.total > 0) result.total else result.results.size
+            )
+            emit(Response.Success(mapped))
+        } catch (e: Exception) {
+            Log.e("Api", "Error fetching all available songs skip=$skip limit=$limit: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
     suspend fun addPlaylistToQueue(userId: String, trackIds: List<String>): Flow<Response<Boolean>> = flow {
         emit(Response.Loading())
         try {
-            networkApi.addPlaylistToQueue(userId, AddMultipleTracksRequest(songs = trackIds))
-            emit(Response.Success(true))
+            val response = networkApi.addPlaylistToQueue(userId, AddMultipleTracksRequest(songs = trackIds))
+            if (response.isSuccessful) {
+                emit(Response.Success(true))
+            } else {
+                emit(Response.Error("Queue sync failed with HTTP ${response.code()}"))
+            }
         } catch (e: Exception) {
             Log.e("Api", "Error adding playlist to queue: ${e.message}")
             emit(Response.Error(e.message ?: "Unknown error"))
@@ -229,6 +371,18 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
             emit(Response.Error(e.message ?: "Unknown error"))
         }
     }
+
+    private fun QueueSongResponse.toDomain(): SongsModel = SongsModel(
+        id = id,
+        name = name,
+        artists = artists.map { artistId -> SongsModel.ArtistRef(id = artistId) },
+        duration = duration_ms,
+        genres = genres,
+        album = SongsModel.AlbumRef(title = album, id = album_id),
+        thumbnail = thumbnail,
+        preview_url = preview_url.orEmpty(),
+        s3link = s3link.orEmpty()
+    )
 
     suspend fun likeDislikeSong(userId: String, likeDislike: Boolean, trackId: String): Flow<Response<Boolean>> = flow {
         emit(Response.Loading())
@@ -540,6 +694,17 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
+    suspend fun getEditorsPlayList(limit: Int): Flow<Response<HomePageSectionModel>> = flow {
+        emit(Response.Loading())
+        try {
+            val result = networkApi.getEditorsPlayList(limit).toDomain()
+            emit(Response.Success(result))
+        } catch (e: Exception) {
+            Log.e("Api", "Error fetching editor playlists: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
     suspend fun getLatestPlaylistCollections(): Flow<Response<List<AlbumsModel>>> = flow {
         emit(Response.Loading())
         try {
@@ -555,11 +720,35 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         emit(Response.Loading())
         try {
             val result = networkApi.getUserPlaylists(userId).map {
-                UserPlaylistModel(id = it.id, name = it.name, image = it.image)
+                UserPlaylistModel(id = it.id, name = it.name, image = it.image, tracks = it.tracks)
             }
             emit(Response.Success(result))
         } catch (e: Exception) {
             Log.e("Api", "Error fetching user playlists: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    suspend fun createNewPlaylist(userId: String, name: String, image: String): Flow<Response<UserPlaylistModel>> = flow {
+        emit(Response.Loading())
+        try {
+            val result = networkApi.createNewPlaylist(
+                userId = userId,
+                name = name,
+                body = CreatePlaylistRequest(image = image)
+            )
+            emit(
+                Response.Success(
+                    UserPlaylistModel(
+                        id = result.id,
+                        name = result.name,
+                        image = result.image,
+                        tracks = result.tracks
+                    )
+                )
+            )
+        } catch (e: Exception) {
+            Log.e("Api", "Error creating playlist: ${e.message}")
             emit(Response.Error(e.message ?: "Unknown error"))
         }
     }

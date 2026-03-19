@@ -1,5 +1,6 @@
 package com.music.stream.neptune.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -14,9 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -24,7 +25,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,34 +38,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavController
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.SongsModel
+import com.music.stream.neptune.di.SongPlayer
+import com.music.stream.neptune.ui.components.UnavailableAudioBadge
 import com.music.stream.neptune.ui.components.Loader
+import com.music.stream.neptune.ui.components.unavailableArtworkColorFilter
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.viewmodel.HomeViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AvailableTracksScreen(navController: NavController) {
+fun AvailableTracksScreen() {
     val homeViewModel: HomeViewModel = hiltViewModel()
     val bgColor = Color(AppBackground.toArgb())
-
-    val allSongs = remember { mutableStateOf<List<SongsModel>>(emptyList()) }
+    val availableSongsPage by homeViewModel.availableSongsPage.collectAsState()
 
     LaunchedEffect(Unit) {
-        try {
-            homeViewModel.albums.collect { response ->
-                if (response is Response.Success) {
-                    allSongs.value = response.data.flatMap { it.songs }.distinctBy { it.id }
-                }
-            }
-        } catch (e: Exception) {
-            // Flow collection cancelled or errored gracefully
-        }
+        homeViewModel.fetchAvailableSongs(skip = 0, limit = 100)
     }
 
     Scaffold(
@@ -84,47 +80,78 @@ fun AvailableTracksScreen(navController: NavController) {
             )
         }
     ) { padding ->
-        val displaySongs = allSongs.value
-        if (displaySongs.isEmpty()) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) { Loader() }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .background(bgColor)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+        when (availableSongsPage) {
+            is Response.Loading -> {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
+                ) { Loader() }
+            }
+            is Response.Error -> {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        "All Songs",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "${displaySongs.size} tracks",
-                        color = Color.Gray,
-                        fontSize = 13.sp
-                    )
+                    Text("Failed to load tracks", color = Color.White)
                 }
-                Spacer(Modifier.height(12.dp))
-                displaySongs.forEachIndexed { index, song ->
-                    AvailableTrackRow(song = song, index = index + 1, navController = navController)
+            }
+            is Response.Success -> {
+                val displaySongs = (availableSongsPage as Response.Success).data.results
+                Log.d("AvailableTracks", "Loaded ${displaySongs.size} songs")
+
+                if (displaySongs.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No available songs returned from API", color = Color.White)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(padding)
+                            .background(bgColor)
+                    ) {
+                        item {
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "All Songs",
+                                    color = Color.White,
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    "${displaySongs.size} tracks",
+                                    color = Color.Gray,
+                                    fontSize = 13.sp
+                                )
+                            }
+                            Spacer(Modifier.height(12.dp))
+                        }
+
+                        itemsIndexed(displaySongs, key = { _, song -> song.id.ifBlank { song.name } }) { index, song ->
+                            AvailableTrackRow(song = song, index = index + 1)
+                        }
+
+                        item {
+                            Spacer(Modifier.height(130.dp))
+                        }
+                    }
                 }
-                Spacer(Modifier.height(130.dp))
             }
         }
     }
@@ -132,7 +159,10 @@ fun AvailableTracksScreen(navController: NavController) {
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-private fun AvailableTrackRow(song: SongsModel, index: Int, navController: NavController) {
+private fun AvailableTrackRow(song: SongsModel, index: Int) {
+    val context = LocalContext.current
+    val isPlayable = song.hasPlayableAudio
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -140,12 +170,11 @@ private fun AvailableTrackRow(song: SongsModel, index: Int, navController: NavCo
             .clip(RoundedCornerShape(8.dp))
             .background(if (index % 2 == 0) Color(0xFF161620) else Color.Transparent)
             .clickable(
+                enabled = isPlayable,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
-                if (song.album.id.isNotEmpty()) {
-                    navController.navigate("album/${song.album.id}")
-                }
+                SongPlayer.playSong(song, context)
             }
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -156,14 +185,20 @@ private fun AvailableTrackRow(song: SongsModel, index: Int, navController: NavCo
             fontSize = 13.sp,
             modifier = Modifier.width(28.dp)
         )
-        GlideImage(
-            model = song.thumbnail,
-            contentDescription = song.name,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(6.dp))
-        )
+        Box {
+            GlideImage(
+                model = song.thumbnail,
+                contentDescription = song.name,
+                contentScale = ContentScale.Crop,
+                colorFilter = unavailableArtworkColorFilter(isPlayable),
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(6.dp))
+            )
+            if (!isPlayable) {
+                UnavailableAudioBadge(modifier = Modifier.align(Alignment.Center))
+            }
+        }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(
@@ -175,12 +210,21 @@ private fun AvailableTrackRow(song: SongsModel, index: Int, navController: NavCo
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = song.artists.joinToString(", ") { it.title },
+                text = song.artists.joinToString(", ") { it.title }.ifBlank { "Unknown artist" },
                 color = Color.Gray,
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            if (!isPlayable) {
+                Text(
+                    text = "Audio unavailable",
+                    color = Color(0xFFBDBDBD),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         if (song.duration > 0) {
             Text(

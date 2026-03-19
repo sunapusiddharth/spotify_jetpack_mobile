@@ -2,12 +2,16 @@ package com.music.stream.neptune.data.entity.web
 
 import com.music.stream.neptune.data.entity.AlbumsModel
 import com.music.stream.neptune.data.entity.ArtistsModel
+import com.music.stream.neptune.data.entity.HomePageCardModel
+import com.music.stream.neptune.data.entity.HomePageSectionModel
 import com.music.stream.neptune.data.entity.PodcastEpisodeModel
 import com.music.stream.neptune.data.entity.PodcastModel
 import com.music.stream.neptune.data.entity.RadioStationModel
 import com.music.stream.neptune.data.entity.SearchCardModel
 import com.music.stream.neptune.data.entity.SearchResultModel
 import com.music.stream.neptune.data.entity.SongsModel
+import com.music.stream.neptune.data.entity.UserModel
+import com.music.stream.neptune.data.entity.UserPlaylistModel
 
 fun WebSongType.toDomain(): SongsModel = SongsModel(
     id = id,
@@ -18,11 +22,15 @@ fun WebSongType.toDomain(): SongsModel = SongsModel(
     duration = duration,
     likes = likes,
     genres = genres,
-    album = SongsModel.AlbumRef(title = album.title, id = album.id, path = album.path),
+    album = SongsModel.AlbumRef(
+        title = album?.title.orEmpty(),
+        id = album?.id.orEmpty(),
+        path = album?.path.orEmpty()
+    ),
     thumbnail = thumbnail,
     view_count = view_count,
-    preview_url = preview_url,
-    s3link = s3link
+    preview_url = preview_url.orEmpty(),
+    s3link = s3link.orEmpty()
 )
 
 fun WebPlayListType.toDomain(): AlbumsModel = AlbumsModel(
@@ -41,6 +49,24 @@ fun WebArtistType.toDomain(): ArtistsModel = ArtistsModel(
     monthly_listeners = monthly_listeners,
     popular_songs = popular_songs.map { it.toDomain() },
     genres = genres
+)
+
+fun WebCardContentType.toDomain(): HomePageCardModel = HomePageCardModel(
+    image = image,
+    id = id,
+    title = title,
+    subtitle = subtitle,
+    type = type,
+    path = path,
+    song = song?.toDomain()
+)
+
+fun WebHomePageDataType.toDomain(): HomePageSectionModel = HomePageSectionModel(
+    cardType = cardType,
+    label = label,
+    path = path,
+    cards = cards.map { it.toDomain() },
+    id = id
 )
 
 fun WebPodcastCardDto.toDomain(): PodcastModel = PodcastModel(
@@ -81,7 +107,8 @@ fun WebSearchPageResType.toDomain(): SearchResultModel = SearchResultModel(
     took = took,
     cards = cards.map {
         SearchCardModel(
-            play_url = it.play_url,
+            play_url = it.play_url.orEmpty(),
+            s3link = it.s3link.orEmpty(),
             id = it.id,
             image = it.image,
             name = it.name,
@@ -90,4 +117,20 @@ fun WebSearchPageResType.toDomain(): SearchResultModel = SearchResultModel(
         )
     },
     type = type
+)
+
+fun WebUserType.toDomain(): UserModel = UserModel(
+    id = id,
+    name = name,
+    playlists = playlists.map {
+        UserPlaylistModel(
+            id = it.id,
+            name = it.name,
+            image = it.image,
+            tracks = it.tracks
+        )
+    },
+    likedSongs = liked_songs,
+    tracks = tracks,
+    artists = artists
 )

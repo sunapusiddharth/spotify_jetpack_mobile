@@ -9,9 +9,12 @@ data class SearchResultModel(
 
 data class SearchCardModel(
     val play_url: String = "",
+    val s3link: String = "",
     val id: String = "",
     val image: String = "",
     val name: String = "",
     val artist: String = "",
     val type: String = ""
-)
+) {
+    val hasPlayableAudio: Boolean get() = s3link.isNotBlank()
+}

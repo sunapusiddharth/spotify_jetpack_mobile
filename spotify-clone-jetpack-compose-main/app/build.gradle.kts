@@ -6,8 +6,28 @@ plugins {
 }
 
 android {
+    val releaseStoreFile = project.findProperty("RELEASE_STORE_FILE") as String?
+    val releaseStorePassword = project.findProperty("RELEASE_STORE_PASSWORD") as String?
+    val releaseKeyAlias = project.findProperty("RELEASE_KEY_ALIAS") as String?
+    val releaseKeyPassword = project.findProperty("RELEASE_KEY_PASSWORD") as String?
+    val hasReleaseSigning = !releaseStoreFile.isNullOrBlank() &&
+        !releaseStorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank()
+
     namespace = "com.music.stream.neptune"
     compileSdk = 34
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.music.stream.neptune"
@@ -24,6 +44,11 @@ android {
         val auth0Domain = (project.findProperty("AUTH0_DOMAIN") as String?) ?: ""
         val auth0ClientId = (project.findProperty("AUTH0_CLIENT_ID") as String?) ?: ""
         val auth0Scheme = (project.findProperty("AUTH0_SCHEME") as String?) ?: "com.music.stream.neptune.auth0"
+        val authBypassEnabled = (project.findProperty("AUTH_BYPASS_ENABLED") as String?)?.toBoolean() ?: false
+        val authBypassUserId = (project.findProperty("AUTH_BYPASS_USER_ID") as String?) ?: "test-user"
+        val authBypassUserName = (project.findProperty("AUTH_BYPASS_USER_NAME") as String?) ?: "Test Listener"
+        val authBypassUserEmail = (project.findProperty("AUTH_BYPASS_USER_EMAIL") as String?) ?: "test@example.com"
+        val enableHttpLogging = (project.findProperty("ENABLE_HTTP_LOGGING") as String?)?.toBoolean() ?: false
 
         manifestPlaceholders["auth0Domain"] = auth0Domain
         manifestPlaceholders["auth0Scheme"] = auth0Scheme
@@ -31,11 +56,19 @@ android {
         buildConfigField("String", "AUTH0_DOMAIN", "\"$auth0Domain\"")
         buildConfigField("String", "AUTH0_CLIENT_ID", "\"$auth0ClientId\"")
         buildConfigField("String", "AUTH0_SCHEME", "\"$auth0Scheme\"")
+        buildConfigField("boolean", "AUTH_BYPASS_ENABLED", authBypassEnabled.toString())
+        buildConfigField("String", "AUTH_BYPASS_USER_ID", "\"$authBypassUserId\"")
+        buildConfigField("String", "AUTH_BYPASS_USER_NAME", "\"$authBypassUserName\"")
+        buildConfigField("String", "AUTH_BYPASS_USER_EMAIL", "\"$authBypassUserEmail\"")
+        buildConfigField("boolean", "ENABLE_HTTP_LOGGING", enableHttpLogging.toString())
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -106,6 +139,9 @@ dependencies {
     //exoplayer
     implementation("androidx.media3:media3-exoplayer:1.3.1")
     implementation("androidx.media3:media3-exoplayer-dash:1.3.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.3.1")
+    implementation("androidx.media3:media3-session:1.3.1")
+    implementation("androidx.media3:media3-ui:1.3.1")
 
     // Retrofit + Gson + OkHttp
     implementation("com.squareup.retrofit2:retrofit:2.9.0")

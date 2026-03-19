@@ -1,5 +1,6 @@
 package com.music.stream.neptune.di
 
+import com.music.stream.neptune.BuildConfig
 import com.music.stream.neptune.data.network.NetworkApi
 import dagger.Module
 import dagger.Provides
@@ -16,13 +17,18 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
-    private const val BASE_URL = "http://localhost:9000/api/spotify/"
+    private const val BASE_URL = "http://192.168.29.200/api/spotify/"
+    const val HLS_BASE_URL = "http://192.168.29.200"
 
     @Provides
     @Singleton
     fun provideOkHttpClient(): OkHttpClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BASIC
+            level = if (BuildConfig.ENABLE_HTTP_LOGGING) {
+                HttpLoggingInterceptor.Level.BASIC
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
         }
         return OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)

@@ -51,7 +51,7 @@ data class WebHomePageDataType(
 )
 
 data class WebPlayListType(
-    val id: Int = 0,
+    val id: String = "",
     val image: String = "",
     val title: String = "",
     val artists: List<WebPlaylistArtistRef> = emptyList(),
@@ -145,11 +145,11 @@ data class WebSongType(
     val duration: Int = 0,
     val likes: Int = 0,
     val genres: List<String> = emptyList(),
-    val album: WebSongAlbumRef = WebSongAlbumRef(),
+    val album: WebSongAlbumRef? = null,
     val thumbnail: String = "",
     val view_count: Int = 0,
-    val preview_url: String = "",
-    val s3link: String = ""
+    val preview_url: String? = null,
+    val s3link: String? = null
 )
 
 data class WebSongArtistRef(
@@ -180,7 +180,8 @@ data class WebSearchPageResType(
 )
 
 data class WebSearchCard(
-    val play_url: String = "",
+    val play_url: String? = null,
+    val s3link: String? = null,
     val id: String = "",
     val image: String = "",
     val name: String = "",
