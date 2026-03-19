@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +36,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,17 +61,19 @@ import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.AlbumsModel
 import com.music.stream.neptune.data.entity.SongsModel
 import com.music.stream.neptune.di.Palette
+import com.music.stream.neptune.di.PlaybackMediaType
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
 import com.music.stream.neptune.ui.viewmodel.AlbumViewModel
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 
 @Composable
 fun AlbumScreen(navController: NavController, albumId: String) {
     val albumViewModel: AlbumViewModel = hiltViewModel()
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val albumState by albumViewModel.album.collectAsState()
     val songsState by albumViewModel.songs.collectAsState()
 
@@ -150,6 +154,12 @@ fun SumUpAlbumScreen(
         dominantColor = color
     }
     val isAlbumSaved = likedAlbumIds.contains(album.id)
+    val isCurrentAlbumPlaying = playerViewModel.mediaType.value == PlaybackMediaType.SONG &&
+        playerViewModel.currentSongPlayingState.value &&
+        playerViewModel.currentSongAlbumTitle.value == album.title
+    val scrollState = rememberSaveable(album.id, saver = ScrollState.Saver) {
+        ScrollState(0)
+    }
 
     val totalDurationMs = albumSongs.sumOf { it.duration }
     val totalDurationText = formatTotalDuration(totalDurationMs)
@@ -182,7 +192,7 @@ fun SumUpAlbumScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(AppBackground.toArgb()))
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
         ) {
             // ── Album Header ─────────────────────────────────────────────────
             Box(
@@ -337,15 +347,15 @@ fun SumUpAlbumScreen(
                                             interactionSource = remember { MutableInteractionSource() },
                                             indication = null
                                         ) {
-                                            if (albumViewModel.currentSongPlayingState.value) {
+                                            if (isCurrentAlbumPlaying) {
                                                 SongPlayer.pause()
-                                                albumViewModel.updateSongState(
-                                                    albumViewModel.currentSongCoverUri.value,
-                                                    albumViewModel.currentSongTitle.value,
-                                                    albumViewModel.currentSongSinger.value,
+                                                playerViewModel.updateSongState(
+                                                    playerViewModel.currentSongCoverUri.value,
+                                                    playerViewModel.currentSongTitle.value,
+                                                    playerViewModel.currentSongSinger.value,
                                                     false,
-                                                    albumViewModel.currentSongId.value,
-                                                    albumViewModel.currentSongIndex.value,
+                                                    playerViewModel.currentSongId.value,
+                                                    playerViewModel.currentSongIndex.value,
                                                     album.title
                                                 )
                                             } else {
@@ -361,8 +371,7 @@ fun SumUpAlbumScreen(
                                     Icon(
                                         modifier = Modifier.size(26.dp),
                                         tint = Color.Black,
-                                        painter = if (albumViewModel.currentSongPlayingState.value &&
-                                            albumViewModel.currentSongAlbum.value == album.title)
+                                        painter = if (isCurrentAlbumPlaying)
                                             painterResource(R.drawable.ic_playing)
                                         else
                                             painterResource(R.drawable.play_svgrepo_com),

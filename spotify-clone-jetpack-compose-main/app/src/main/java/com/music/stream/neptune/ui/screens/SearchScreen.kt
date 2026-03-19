@@ -70,6 +70,7 @@ import com.music.stream.neptune.ui.components.unavailableArtworkColorFilter
 import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.SearchViewModel
 import kotlinx.coroutines.delay
@@ -84,7 +85,7 @@ enum class SearchFilter(val label: String, val apiType: String) {
 @Composable
 fun SearchScreen(navController: NavController) {
     val searchViewModel: SearchViewModel = hiltViewModel()
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val songs by searchViewModel.songs.collectAsState()
 
     Surface(

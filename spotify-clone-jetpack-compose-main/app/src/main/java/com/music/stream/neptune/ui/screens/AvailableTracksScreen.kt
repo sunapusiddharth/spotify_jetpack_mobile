@@ -49,13 +49,14 @@ import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.components.unavailableArtworkColorFilter
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.viewmodel.HomeViewModel
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AvailableTracksScreen() {
     val homeViewModel: HomeViewModel = hiltViewModel()
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val bgColor = Color(AppBackground.toArgb())
     val availableSongsPage by homeViewModel.availableSongsPage.collectAsState()
     val context = LocalContext.current

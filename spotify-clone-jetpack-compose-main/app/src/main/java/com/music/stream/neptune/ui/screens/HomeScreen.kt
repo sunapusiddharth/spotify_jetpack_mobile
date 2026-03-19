@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -41,6 +42,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -80,6 +82,7 @@ import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.GridBackground
 import com.music.stream.neptune.ui.viewmodel.HomeViewModel
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import kotlinx.coroutines.delay
 
@@ -95,7 +98,7 @@ private val HomeArtistCardWidth = 96.dp
 @Composable
 fun HomeScreen(navController: NavController) {
     val homeViewModel: HomeViewModel = hiltViewModel()
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val homePage by homeViewModel.homePage.collectAsState()
     val isLoadingNextHomePage by homeViewModel.isLoadingNextHomePage.collectAsState()
     val hasMoreHomePages by homeViewModel.hasMoreHomePages.collectAsState()
@@ -105,7 +108,9 @@ fun HomeScreen(navController: NavController) {
     val topPodcasts by homeViewModel.topPodcasts.collectAsState()
     val historyEntries by homeViewModel.historyEntries.collectAsState()
 
-    val listState = rememberLazyListState()
+    val listState = rememberSaveable(saver = LazyListState.Saver) {
+        LazyListState()
+    }
 
     Surface(
         modifier = Modifier
@@ -315,7 +320,7 @@ private fun HomeHistorySection(
                             indication = null
                         ) {
                             when {
-                                entry.isSong -> playerViewModel.playSongFromHistory(entry, context)
+                                entry.isSong -> playerViewModel.playSongFromHistory(entry, entries, context)
                                 entry.isRadioStation -> playerViewModel.playRadioFromHistory(entry, context)
                                 entry.isPodcastEpisode -> playerViewModel.playPodcastEpisodeFromHistory(entry, context)
                                 entry.isPodcast -> navController.navigate("${Routes.PodcastDetail.route}/${entry.entityId}")
@@ -380,7 +385,9 @@ fun GreetingSection() {
 private fun HomeCardSection(navController: NavController, section: HomePageSectionModel, playerViewModel: PlayerViewModel) {
     val context = LocalContext.current
     val playableSongs = remember(section.cards) {
-        section.cards.mapNotNull { it.song }.filter { it.hasPlayableAudio }
+        section.cards
+            .mapNotNull { it.song }
+            .filter { it.s3link.isNotBlank() }
     }
     val titleClickable = section.path.isNotBlank() || section.id.isNotBlank()
     val showsPlaylistCollectionIndicator = remember(section) { sectionNavigatesToPlaylistCollection(section) }
@@ -427,7 +434,7 @@ private fun HomeCardSection(navController: NavController, section: HomePageSecti
         LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
             items(section.cards.size) { index ->
                 val card = section.cards[index]
-                val isPlayableSong = card.song?.hasPlayableAudio == true
+                val isPlayableSong = card.song?.s3link?.isNotBlank() == true
                 val interactionSource = remember { MutableInteractionSource() }
                 Box(
                     modifier = Modifier

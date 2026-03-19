@@ -3,7 +3,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -21,6 +20,7 @@ import com.music.stream.neptune.ui.screens.PodcastGenreScreen
 import com.music.stream.neptune.ui.screens.PodcastScreen
 import com.music.stream.neptune.ui.screens.RadioScreen
 import com.music.stream.neptune.ui.screens.SearchScreen
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 
 @Composable
@@ -29,7 +29,7 @@ fun MyNavHost(
     bottomBarState: MutableState<Boolean>,
     bottomBarPlayerState: MutableState<Boolean>
 ) {
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val playerState by playerViewModel.currentSongTitle
 
     NavHost(navController = navHostController, startDestination = Routes.Home.route) {

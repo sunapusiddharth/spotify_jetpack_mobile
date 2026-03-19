@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -41,6 +42,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +65,7 @@ import com.music.stream.neptune.data.entity.RadioStationModel
 import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.RadioViewModel
 
@@ -70,7 +73,7 @@ import com.music.stream.neptune.ui.viewmodel.RadioViewModel
 @Composable
 fun RadioScreen(@Suppress("UNUSED_PARAMETER") navController: NavController) {
     val radioViewModel: RadioViewModel = hiltViewModel()
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
 
     val countriesState by radioViewModel.countries.collectAsState()
     val genresState by radioViewModel.genres.collectAsState()
@@ -85,6 +88,9 @@ fun RadioScreen(@Suppress("UNUSED_PARAMETER") navController: NavController) {
 
     var selectedCountry by remember { mutableStateOf("US") }
     var selectedGenreTab by remember { mutableStateOf(0) }
+    val scrollState = rememberSaveable(selectedCountry, selectedGenreTab, saver = ScrollState.Saver) {
+        ScrollState(0)
+    }
 
     val genres = if (genresState is Response.Success) {
         listOf(RadioGenreAggModel(value = "", count = 0)) + (genresState as Response.Success).data
@@ -118,7 +124,7 @@ fun RadioScreen(@Suppress("UNUSED_PARAMETER") navController: NavController) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(padding)
                 .background(bgColor)
         ) {

@@ -83,6 +83,7 @@ import com.music.stream.neptune.ui.components.pressScale
 import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import kotlin.math.abs
 import kotlinx.coroutines.delay
@@ -90,7 +91,7 @@ import kotlinx.coroutines.delay
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun PlayerScreen(navController: NavController) {
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val songTitle = playerViewModel.currentSongTitle.value
     val songSinger = playerViewModel.currentSongSinger.value
     val songCoverUri = playerViewModel.currentSongCoverUri.value
@@ -100,7 +101,6 @@ fun PlayerScreen(navController: NavController) {
     val songAlbumTitle = playerViewModel.currentSongAlbumTitle.value
     val songAlbumId = playerViewModel.currentSongAlbumId.value
     val context = LocalContext.current
-    val likedSongIds by playerViewModel.likedSongIds.collectAsState()
     val actionMessage by playerViewModel.actionMessage.collectAsState()
     val userPlaylistsState by playerViewModel.userPlaylists.collectAsState()
     var showPlaylistPicker by remember { mutableStateOf(false) }
@@ -263,8 +263,12 @@ fun PlayerScreen(navController: NavController) {
                             navController.navigate("${Routes.Album.route}/$songAlbumId")
                         }
                     },
-                    isLiked = likedSongIds.contains(songId),
-                    showLike = mediaType == PlaybackMediaType.SONG,
+                    isLiked = playerViewModel.likeState.value,
+                    showLike = songId.isNotBlank() && mediaType in setOf(
+                        PlaybackMediaType.SONG,
+                        PlaybackMediaType.RADIO,
+                        PlaybackMediaType.PODCAST
+                    ),
                     onLike = { playerViewModel.toggleLikeCurrentMedia() }
                 )
 
@@ -755,7 +759,7 @@ fun PlayerInfo(
             Text(
                 text = songTitle,
                 color = Color.White,
-                fontSize = 20.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

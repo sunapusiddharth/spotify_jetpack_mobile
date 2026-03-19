@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -69,7 +71,10 @@ import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
 import com.music.stream.neptune.ui.viewmodel.AlbumViewModel
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
+
+private val playlistScrollPositions = mutableMapOf<String, Int>()
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
@@ -205,13 +210,20 @@ private fun PlaylistCollectionContent(
     val currentSongId by viewModel.currentSongId
     val currentAlbum by viewModel.currentSongAlbum
     val paletteColor = Color(AppPalette.toArgb())
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val likedSongIds by playerViewModel.likedSongIds.collectAsState()
 
     val playlistSongs = playlist.songs
     val playableSongs = playlistSongs.filter { it.hasPlayableAudio }
     val isThisPlaying = playingState && currentAlbum == playlist.id
-    val scrollState = rememberScrollState()
+    val initialScroll = remember(playlist.id) { playlistScrollPositions[playlist.id] ?: 0 }
+    val scrollState = rememberScrollState(initial = initialScroll)
+
+    DisposableEffect(playlist.id, scrollState) {
+        onDispose {
+            playlistScrollPositions[playlist.id] = scrollState.value
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -349,7 +361,6 @@ private fun PlaylistCollectionContent(
                                         album = playlist.id,
                                         context = context
                                     )
-                                    navController.navigate(Routes.Player.route)
                                 }
                             }
                         )

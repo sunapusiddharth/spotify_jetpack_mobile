@@ -10,11 +10,14 @@ class AppRepository @Inject constructor(private val api: Api) {
 
     fun observeLikedSongIds(): StateFlow<Set<String>> = api.observeLikedSongIds()
     fun observeLikedAlbumIds(): StateFlow<Set<String>> = api.observeLikedAlbumIds()
+    fun observeLikedEntityKeys(): StateFlow<Set<String>> = api.observeLikedEntityKeys()
     fun clearCachedUserProfile() = api.clearCachedUser()
     fun updateCachedSongLike(userId: String, trackId: String, liked: Boolean) =
         api.updateCachedSongLike(userId, trackId, liked)
     fun updateCachedAlbumLike(albumId: String, liked: Boolean) =
         api.updateCachedAlbumLike(albumId, liked)
+    fun updateCachedEntityLike(entityType: String, entityId: String, liked: Boolean) =
+        api.updateCachedEntityLike(entityType, entityId, liked)
 
     suspend fun refreshLikedSongs(userId: String) = api.refreshLikedSongs(userId)
     suspend fun provideUserById(userId: String) = api.getUserById(userId)
@@ -37,6 +40,14 @@ class AppRepository @Inject constructor(private val api: Api) {
         api.likeDislikeSong(userId, likeDislike, song)
     suspend fun provideLikeDislikeAlbum(userId: String, likeDislike: Boolean, album: com.music.stream.neptune.data.entity.AlbumsModel) =
         api.likeDislikeAlbum(userId, likeDislike, album)
+    suspend fun provideLikeDislikeRadioStation(userId: String, likeDislike: Boolean, station: com.music.stream.neptune.data.entity.RadioStationModel) =
+        api.likeDislikeRadioStation(userId, likeDislike, station)
+    suspend fun provideLikeDislikePodcastEpisode(
+        userId: String,
+        likeDislike: Boolean,
+        podcast: com.music.stream.neptune.data.entity.PodcastModel,
+        episode: com.music.stream.neptune.data.entity.PodcastEpisodeModel
+    ) = api.likeDislikePodcastEpisode(userId, likeDislike, podcast, episode)
     suspend fun provideUserPlayedSong(userId: String, song: com.music.stream.neptune.data.entity.SongsModel, duration: Int) =
         api.userPlayedSong(userId, song, duration)
     suspend fun provideAllAvailableSongs(skip: Int, limit: Int) = api.getAllAvailableSongs(skip, limit)

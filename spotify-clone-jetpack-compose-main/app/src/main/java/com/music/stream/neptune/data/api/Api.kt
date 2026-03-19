@@ -54,15 +54,20 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
     private var cachedSongs: List<SongsModel>? = null
     private var cachedUser: UserModel? = null
     private val likedSongIds = MutableStateFlow<Set<String>>(emptySet())
-        private val likedAlbumIds = MutableStateFlow<Set<String>>(emptySet())
+    private val likedAlbumIds = MutableStateFlow<Set<String>>(emptySet())
+    private val likedEntityKeys = MutableStateFlow<Set<String>>(emptySet())
 
     fun observeLikedSongIds(): StateFlow<Set<String>> = likedSongIds.asStateFlow()
-        fun observeLikedAlbumIds(): StateFlow<Set<String>> = likedAlbumIds.asStateFlow()
+    fun observeLikedAlbumIds(): StateFlow<Set<String>> = likedAlbumIds.asStateFlow()
+    fun observeLikedEntityKeys(): StateFlow<Set<String>> = likedEntityKeys.asStateFlow()
+
+    private fun entityLikeKey(entityType: String, entityId: String): String = "$entityType:$entityId"
 
     fun clearCachedUser() {
         cachedUser = null
         likedSongIds.value = emptySet()
-            likedAlbumIds.value = emptySet()
+        likedAlbumIds.value = emptySet()
+        likedEntityKeys.value = emptySet()
     }
 
     private fun LikedEntityResponseDto.toDomain(): UserLikedEntityModel = UserLikedEntityModel(
@@ -97,6 +102,7 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
             if (liked) add(trackId) else remove(trackId)
         }
         likedSongIds.value = nextIds
+        updateCachedEntityLike("song", trackId, liked)
 
         val existing = cachedUser
         if (existing != null && existing.id == userId) {
@@ -104,14 +110,24 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
-        fun updateCachedAlbumLike(albumId: String, liked: Boolean) {
-            if (albumId.isBlank()) return
+    fun updateCachedAlbumLike(albumId: String, liked: Boolean) {
+        if (albumId.isBlank()) return
 
-            val nextIds = likedAlbumIds.value.toMutableSet().apply {
-                if (liked) add(albumId) else remove(albumId)
-            }
-            likedAlbumIds.value = nextIds
+        val nextIds = likedAlbumIds.value.toMutableSet().apply {
+            if (liked) add(albumId) else remove(albumId)
         }
+        likedAlbumIds.value = nextIds
+        updateCachedEntityLike("album", albumId, liked)
+    }
+
+    fun updateCachedEntityLike(entityType: String, entityId: String, liked: Boolean) {
+        if (entityType.isBlank() || entityId.isBlank()) return
+
+        val key = entityLikeKey(entityType, entityId)
+        likedEntityKeys.value = likedEntityKeys.value.toMutableSet().apply {
+            if (liked) add(key) else remove(key)
+        }
+    }
 
     suspend fun getUserById(userId: String): Flow<Response<UserModel>> = flow {
         emit(Response.Loading())
@@ -145,6 +161,7 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
             if (userId.isBlank()) {
                 likedSongIds.value = emptySet()
                 likedAlbumIds.value = emptySet()
+                likedEntityKeys.value = emptySet()
                 emit(Response.Success(emptySet()))
                 return@flow
             }
@@ -154,12 +171,16 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
                 .filter { it.entityType == "song" }
                 .map { it.entityId }
                 .toSet()
-                val albumIds = likes.items
-                    .filter { it.entityType == "album" }
-                    .map { it.entityId }
-                    .toSet()
+            val albumIds = likes.items
+                .filter { it.entityType == "album" }
+                .map { it.entityId }
+                .toSet()
+            val entityKeys = likes.items
+                .map { entityLikeKey(it.entityType, it.entityId) }
+                .toSet()
             likedSongIds.value = ids
-                likedAlbumIds.value = albumIds
+            likedAlbumIds.value = albumIds
+            likedEntityKeys.value = entityKeys
             emit(Response.Success(ids))
         } catch (e: Exception) {
             Log.e("Api", "Error refreshing liked songs: ${e.message}")
@@ -476,34 +497,99 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
-        suspend fun likeDislikeAlbum(userId: String, likeDislike: Boolean, album: AlbumsModel): Flow<Response<Boolean>> = flow {
-            emit(Response.Loading())
-            try {
-                if (album.id.isBlank()) {
-                    emit(Response.Error("Album id is missing"))
-                    return@flow
-                }
-                if (likeDislike) {
-                    networkApi.likeEntity(
-                        userId,
-                        album.id,
-                        LikeEntityRequest(
-                            entityId = album.id,
-                            entityType = "album",
-                            title = album.title,
-                            image = album.image.takeIf { it.isNotBlank() },
-                            albumName = album.title.takeIf { it.isNotBlank() }
-                        )
-                    )
-                } else {
-                    networkApi.unlikeEntity(userId, album.id)
-                }
-                emit(Response.Success(true))
-            } catch (e: Exception) {
-                Log.e("Api", "Error like/dislike album: ${e.message}")
-                emit(Response.Error(e.message ?: "Unknown error"))
+    suspend fun likeDislikeAlbum(userId: String, likeDislike: Boolean, album: AlbumsModel): Flow<Response<Boolean>> = flow {
+        emit(Response.Loading())
+        try {
+            if (album.id.isBlank()) {
+                emit(Response.Error("Album id is missing"))
+                return@flow
             }
+            if (likeDislike) {
+                networkApi.likeEntity(
+                    userId,
+                    album.id,
+                    LikeEntityRequest(
+                        entityId = album.id,
+                        entityType = "album",
+                        title = album.title,
+                        image = album.image.takeIf { it.isNotBlank() },
+                        albumName = album.title.takeIf { it.isNotBlank() }
+                    )
+                )
+            } else {
+                networkApi.unlikeEntity(userId, album.id)
+            }
+            emit(Response.Success(true))
+        } catch (e: Exception) {
+            Log.e("Api", "Error like/dislike album: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
         }
+    }
+
+    suspend fun likeDislikeRadioStation(userId: String, likeDislike: Boolean, station: RadioStationModel): Flow<Response<Boolean>> = flow {
+        emit(Response.Loading())
+        try {
+            if (station.id.isBlank()) {
+                emit(Response.Error("Station id is missing"))
+                return@flow
+            }
+            if (likeDislike) {
+                networkApi.likeEntity(
+                    userId,
+                    station.id,
+                    LikeEntityRequest(
+                        entityId = station.id,
+                        entityType = "radio_station",
+                        title = station.name,
+                        image = station.coverUri.takeIf { it.isNotBlank() },
+                        s3link = station.stream_url.takeIf { it.isNotBlank() }
+                    )
+                )
+            } else {
+                networkApi.unlikeEntity(userId, station.id)
+            }
+            emit(Response.Success(true))
+        } catch (e: Exception) {
+            Log.e("Api", "Error like/dislike station: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    suspend fun likeDislikePodcastEpisode(
+        userId: String,
+        likeDislike: Boolean,
+        podcast: PodcastModel,
+        episode: PodcastEpisodeModel
+    ): Flow<Response<Boolean>> = flow {
+        emit(Response.Loading())
+        try {
+            if (episode.id.isBlank()) {
+                emit(Response.Error("Episode id is missing"))
+                return@flow
+            }
+            if (likeDislike) {
+                networkApi.likeEntity(
+                    userId,
+                    episode.id,
+                    LikeEntityRequest(
+                        entityId = episode.id,
+                        entityType = "podcast_episode",
+                        title = episode.title,
+                        image = episode.thumbnail.takeIf { it.isNotBlank() } ?: podcast.image.takeIf { it.isNotBlank() },
+                        s3link = episode.s3link.takeIf { it.isNotBlank() } ?: episode.preview_url.takeIf { it.isNotBlank() },
+                        podcastName = podcast.title.takeIf { it.isNotBlank() },
+                        episodeNumber = episode.episode_number.takeIf { it > 0 }
+                    )
+                )
+            } else {
+                networkApi.unlikeEntity(userId, episode.id)
+            }
+            emit(Response.Success(true))
+        } catch (e: Exception) {
+            Log.e("Api", "Error like/dislike podcast episode: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
 
     // ── Podcast ───────────────────────────────────────────────────────────────
     suspend fun browsePodcasts(page: Int): Flow<Response<PodcastBrowseResponse>> = flow {

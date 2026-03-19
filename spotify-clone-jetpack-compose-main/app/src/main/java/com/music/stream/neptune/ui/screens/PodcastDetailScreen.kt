@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +35,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
@@ -58,6 +60,7 @@ import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.components.Snackbar
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PodcastViewModel
 import kotlinx.coroutines.delay
@@ -73,7 +76,7 @@ fun PodcastDetailScreen(navController: NavController, podcastId: String?) {
     }
 
     val viewModel: PodcastViewModel = hiltViewModel()
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val podcastState by viewModel.selectedPodcast.collectAsState()
     val episodesState by viewModel.episodes.collectAsState()
     val selectedEpisodeId by viewModel.selectedEpisodeId.collectAsState()
@@ -97,6 +100,9 @@ fun PodcastDetailScreen(navController: NavController, podcastId: String?) {
     }
 
     val bgColor = Color(AppBackground.toArgb())
+    val scrollState = rememberSaveable(podcastId, saver = ScrollState.Saver) {
+        ScrollState(0)
+    }
 
     Box(
         modifier = Modifier
@@ -110,7 +116,7 @@ fun PodcastDetailScreen(navController: NavController, podcastId: String?) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
+                        .verticalScroll(scrollState)
                 ) {
                     if (actionMessage != null) {
                         Snackbar(showMessage = actionMessage ?: "")

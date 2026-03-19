@@ -8,6 +8,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +26,8 @@ import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.screens.AuthLoadingScreen
 import com.music.stream.neptune.ui.screens.AuthLoginScreen
 import com.music.stream.neptune.ui.viewmodel.AuthViewModel
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
+import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import kotlinx.coroutines.launch
 
 
@@ -56,6 +59,7 @@ fun App() {
     val bottomBarState = rememberSaveable { (mutableStateOf(true)) }
     val bottomBarPlayerState = rememberSaveable { (mutableStateOf(true)) }
     val navController = rememberNavController()
+    val playerViewModel: PlayerViewModel = hiltViewModel()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
@@ -84,40 +88,43 @@ fun App() {
         "${Routes.PlaylistCollection.route}/{collectionId}"
     )
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        gesturesEnabled = drawerGesturesEnabled,
-        drawerContent = {
-            AppDrawer(
-                currentRoute = currentRoute,
-                navController = navController,
-                userName = authState.user?.name.orEmpty(),
-                userEmail = authState.user?.email.orEmpty(),
-                onClose = { coroutineScope.launch { drawerState.close() } },
-                onLogout = {
-                    if (activity != null) {
-                        authViewModel.logout(activity)
-                    }
-                }
-            )
-        }
-    ) {
-        Scaffold(
-            modifier = Modifier.navigationBarsPadding(),
-            bottomBar = {
-                MainBottomNavigation(
+    CompositionLocalProvider(LocalSharedPlayerViewModel provides playerViewModel) {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            gesturesEnabled = drawerGesturesEnabled,
+            drawerContent = {
+                AppDrawer(
+                    currentRoute = currentRoute,
                     navController = navController,
+                    userName = authState.user?.name.orEmpty(),
+                    userEmail = authState.user?.email.orEmpty(),
+                    onClose = { coroutineScope.launch { drawerState.close() } },
+                    onLogout = {
+                        if (activity != null) {
+                            authViewModel.logout(activity)
+                        }
+                    }
+                )
+        }
+
+        ) {
+            Scaffold(
+                modifier = Modifier.navigationBarsPadding(),
+                bottomBar = {
+                    MainBottomNavigation(
+                        navController = navController,
+                        bottomBarState = bottomBarState,
+                        bottomBarPlayerState = bottomBarPlayerState,
+                        onMenuClick = { coroutineScope.launch { drawerState.open() } }
+                    )
+                }
+            ) {
+                MyNavHost(
+                    navHostController = navController,
                     bottomBarState = bottomBarState,
-                    bottomBarPlayerState = bottomBarPlayerState,
-                    onMenuClick = { coroutineScope.launch { drawerState.open() } }
+                    bottomBarPlayerState = bottomBarPlayerState
                 )
             }
-        ) {
-            MyNavHost(
-                navHostController = navController,
-                bottomBarState = bottomBarState,
-                bottomBarPlayerState = bottomBarPlayerState
-            )
         }
     }
 }

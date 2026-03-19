@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -76,13 +78,14 @@ import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
 import com.music.stream.neptune.ui.viewmodel.ArtistViewModel
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import kotlinx.coroutines.launch
 
 @Composable
 fun ArtistScreen(navController: NavController, artistId: String) {
     val artistViewModel: ArtistViewModel = hiltViewModel()
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val artistState by artistViewModel.artist.collectAsState()
     val artistSongsState by artistViewModel.artistSongs.collectAsState()
 
@@ -153,6 +156,9 @@ fun SumUpArtistScreen(
 
     val tabTitles = listOf("Popular Songs", "About")
     val pagerState = rememberPagerState(pageCount = { tabTitles.size })
+    val scrollState = rememberSaveable(artist.id, saver = ScrollState.Saver) {
+        ScrollState(0)
+    }
 
     Scaffold(
         containerColor = Color(AppBackground.toArgb()),
@@ -182,7 +188,7 @@ fun SumUpArtistScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(AppBackground.toArgb()))
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
         ) {
 
             // ── Hero Header ──────────────────────────────────────────────────

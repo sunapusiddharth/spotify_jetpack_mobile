@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -32,6 +33,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,6 +55,7 @@ import com.music.stream.neptune.data.entity.PodcastModel
 import com.music.stream.neptune.data.entity.UserHistoryEntityModel
 import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.navigation.Routes
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.viewmodel.PodcastViewModel
@@ -61,13 +64,16 @@ import com.music.stream.neptune.ui.viewmodel.PodcastViewModel
 @Composable
 fun PodcastScreen(navController: NavController) {
     val podcastViewModel: PodcastViewModel = hiltViewModel()
-    val playerViewModel: PlayerViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val podcastsState by podcastViewModel.podcasts.collectAsState()
     val genresState by podcastViewModel.genres.collectAsState()
     val historyState by podcastViewModel.historyEntries.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
 
     val bgColor = Color(AppBackground.toArgb())
+    val scrollState = rememberSaveable(saver = ScrollState.Saver) {
+        ScrollState(0)
+    }
 
     Scaffold(
         containerColor = bgColor,
@@ -90,7 +96,7 @@ fun PodcastScreen(navController: NavController) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(padding)
                 .background(bgColor)
         ) {

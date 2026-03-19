@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
@@ -60,6 +59,7 @@ import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.components.pressScale
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.GridBackground
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.abs
@@ -87,7 +87,7 @@ fun Loader() {
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun MiniPlayer(navController: NavHostController) {
-    val miniPlayerViewModel: PlayerViewModel = hiltViewModel()
+    val miniPlayerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val songTitle = miniPlayerViewModel.currentSongTitle.value
     val songSinger = miniPlayerViewModel.currentSongSinger.value
     val songCoverUri = miniPlayerViewModel.currentSongCoverUri.value
@@ -101,8 +101,12 @@ fun MiniPlayer(navController: NavHostController) {
     val expandInteractionSource = remember { MutableInteractionSource() }
     val context = LocalContext.current
     val likeState = miniPlayerViewModel.likeState.value
-    val canLikeCurrentSong = miniPlayerViewModel.mediaType.value == PlaybackMediaType.SONG && songId.isNotBlank()
-    val isLiked = canLikeCurrentSong && likeState
+    val canLikeCurrentMedia = songId.isNotBlank() && miniPlayerViewModel.mediaType.value in setOf(
+        PlaybackMediaType.SONG,
+        PlaybackMediaType.RADIO,
+        PlaybackMediaType.PODCAST
+    )
+    val isLiked = canLikeCurrentMedia && likeState
     val likeScale by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (isLiked) 1.16f else 1f,
         animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 420f),
@@ -117,16 +121,10 @@ fun MiniPlayer(navController: NavHostController) {
         0f
     }
 
-    val currentRoute = navController.currentBackStackEntry?.destination?.route
-
     LaunchedEffect(key1 = songPlayingState) {
         while (songPlayingState) {
             songProgress = SongPlayer.getCurrentPosition().toFloat() / SongPlayer.getDuration().toFloat()
             delay(300L)
-            if (songProgress > 0f && songProgress >= 1f && currentRoute != Routes.Player.route) {
-                navController.navigate(Routes.Player.route)
-                songPlayingState = false
-            }
         }
     }
     var darkVibrantColor by remember { mutableStateOf(Color(GridBackground.toArgb())) }
@@ -176,7 +174,9 @@ fun MiniPlayer(navController: NavHostController) {
                     interactionSource = expandInteractionSource,
                     indication = null
                 ) {
-                    navController.navigate(Routes.Player.route)
+                    navController.navigate(Routes.Player.route) {
+                        launchSingleTop = true
+                    }
                 }
         ) {
             Row(
@@ -227,13 +227,13 @@ fun MiniPlayer(navController: NavHostController) {
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
-                            if (canLikeCurrentSong) {
-                                miniPlayerViewModel.toggleSongLike(songId)
+                            if (canLikeCurrentMedia) {
+                                miniPlayerViewModel.toggleLikeCurrentMedia()
                             }
                         },
                     painter = if (isLiked) painterResource(id = R.drawable.added)
                     else painterResource(id = R.drawable.ic_add),
-                    tint = if (canLikeCurrentSong) Color.White else Color.LightGray,
+                    tint = if (canLikeCurrentMedia) Color.White else Color.LightGray,
                     contentDescription = ""
                 )
                 Icon(

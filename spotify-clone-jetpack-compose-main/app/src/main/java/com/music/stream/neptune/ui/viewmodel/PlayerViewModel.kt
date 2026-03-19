@@ -71,6 +71,7 @@ class PlayerViewModel @Inject constructor(
     val likeState = currentSongState.likeState
     val likedSongIds: StateFlow<Set<String>> = repository.observeLikedSongIds()
     val likedAlbumIds: StateFlow<Set<String>> = repository.observeLikedAlbumIds()
+    val likedEntityKeys: StateFlow<Set<String>> = repository.observeLikedEntityKeys()
 
     private val _actionMessage = MutableStateFlow<String?>(null)
     val actionMessage: StateFlow<String?> = _actionMessage
@@ -91,10 +92,15 @@ class PlayerViewModel @Inject constructor(
         restorePersistedPlayback()
         fetchSongs()
         observeUserLikes()
-        observeLikedSongState()
+        observeLikedEntityState()
     }
 
     private fun restorePersistedPlayback() {
+        if (currentSongId.value.isNotBlank() || SongPlayer.isPrepared()) {
+            syncCurrentMediaLikeState()
+            return
+        }
+
         val snapshot = playbackPreferences.loadSnapshot() ?: return
         val restoredType = runCatching {
             PlaybackMediaType.valueOf(snapshot.mediaType)
@@ -217,29 +223,39 @@ class PlayerViewModel @Inject constructor(
             observedUserId = userId
             if (userId.isBlank()) {
                 repository.clearCachedUserProfile()
-                syncCurrentSongLikeState()
+                syncCurrentMediaLikeState()
                 return@collectLatest
             }
 
             repository.refreshLikedSongs(userId).collect { result ->
                 if (result is Response.Success) {
-                    syncCurrentSongLikeState()
+                    syncCurrentMediaLikeState()
                 }
             }
         }
     }
 
-    private fun observeLikedSongState() = viewModelScope.launch {
-        likedSongIds.collectLatest {
-            syncCurrentSongLikeState()
+    private fun observeLikedEntityState() = viewModelScope.launch {
+        likedEntityKeys.collectLatest {
+            syncCurrentMediaLikeState()
         }
     }
 
-    private fun syncCurrentSongLikeState() {
-        val isLikedSong = mediaType.value == PlaybackMediaType.SONG &&
-            currentSongId.value.isNotBlank() &&
-            likedSongIds.value.contains(currentSongId.value)
-        currentSongState.updateLikeState(isLikedSong)
+    private fun syncCurrentMediaLikeState() {
+        val key = currentEntityLikeKey()
+        currentSongState.updateLikeState(key != null && likedEntityKeys.value.contains(key))
+    }
+
+    private fun currentEntityLikeKey(): String? {
+        val entityId = currentSongId.value
+        if (entityId.isBlank()) return null
+
+        val entityType = when (mediaType.value) {
+            PlaybackMediaType.SONG -> "song"
+            PlaybackMediaType.RADIO -> "radio_station"
+            PlaybackMediaType.PODCAST -> "podcast_episode"
+        }
+        return "$entityType:$entityId"
     }
 
     fun startSongPlayback(
@@ -558,17 +574,32 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun toggleLikeCurrentMedia() = viewModelScope.launch(Dispatchers.IO) {
-        if (mediaType.value != PlaybackMediaType.SONG) return@launch
-
         val userId = currentUserIdOrEmail()
         if (userId.isBlank()) {
             _actionMessage.value = "Login required"
             return@launch
         }
-        val trackId = currentSongId.value
-        if (trackId.isBlank()) return@launch
 
-        toggleSongLikeInternal(userId, trackId, likedSongIds.value.contains(trackId))
+        when (mediaType.value) {
+            PlaybackMediaType.SONG -> {
+                val trackId = currentSongId.value
+                if (trackId.isBlank()) return@launch
+                toggleSongLikeInternal(userId, trackId, likedSongIds.value.contains(trackId))
+            }
+            PlaybackMediaType.RADIO -> {
+                val queue = currentSongState.getRadioSourceQueue()
+                if (queue.isEmpty()) return@launch
+                val station = queue[radioIndex.value.coerceIn(0, queue.lastIndex)]
+                toggleRadioStationLikeInternal(userId, station)
+            }
+            PlaybackMediaType.PODCAST -> {
+                val podcast = activePodcast.value ?: return@launch
+                val queue = currentSongState.getPodcastSourceQueue()
+                if (queue.isEmpty()) return@launch
+                val episode = queue[podcastIndex.value.coerceIn(0, queue.lastIndex)]
+                togglePodcastEpisodeLikeInternal(userId, podcast, episode)
+            }
+        }
     }
 
     fun toggleSongLike(songId: String) = viewModelScope.launch(Dispatchers.IO) {
@@ -599,6 +630,46 @@ class PlayerViewModel @Inject constructor(
                     _actionMessage.value = if (nextState) "Album saved" else "Album removed"
                 }
                 is Response.Error -> _actionMessage.value = "Album save failed"
+                else -> Unit
+            }
+        }
+    }
+
+    private suspend fun toggleRadioStationLikeInternal(userId: String, station: RadioStationModel) {
+        val key = "radio_station:${station.id}"
+        val nextState = !likedEntityKeys.value.contains(key)
+        repository.provideLikeDislikeRadioStation(userId, nextState, station).collect { result ->
+            when (result) {
+                is Response.Success -> {
+                    repository.updateCachedEntityLike("radio_station", station.id, nextState)
+                    if (currentSongId.value == station.id && mediaType.value == PlaybackMediaType.RADIO) {
+                        updateLikeState(nextState)
+                    }
+                    _actionMessage.value = if (nextState) "Added to favorites" else "Removed from favorites"
+                }
+                is Response.Error -> _actionMessage.value = "Favorite update failed"
+                else -> Unit
+            }
+        }
+    }
+
+    private suspend fun togglePodcastEpisodeLikeInternal(
+        userId: String,
+        podcast: PodcastModel,
+        episode: PodcastEpisodeModel
+    ) {
+        val key = "podcast_episode:${episode.id}"
+        val nextState = !likedEntityKeys.value.contains(key)
+        repository.provideLikeDislikePodcastEpisode(userId, nextState, podcast, episode).collect { result ->
+            when (result) {
+                is Response.Success -> {
+                    repository.updateCachedEntityLike("podcast_episode", episode.id, nextState)
+                    if (currentSongId.value == episode.id && mediaType.value == PlaybackMediaType.PODCAST) {
+                        updateLikeState(nextState)
+                    }
+                    _actionMessage.value = if (nextState) "Added to favorites" else "Removed from favorites"
+                }
+                is Response.Error -> _actionMessage.value = "Favorite update failed"
                 else -> Unit
             }
         }
@@ -645,8 +716,32 @@ class PlayerViewModel @Inject constructor(
 
     fun playSongFromHistory(entry: UserHistoryEntityModel, context: Context) {
         if (!entry.isSong || entry.s3link.isBlank()) return
-        val song = entry.toSongModel()
-        startSongPlayback(listOf(song), 0, entry.subtitle.ifBlank { "History" }, context)
+        playSongFromHistory(
+            entry,
+            historyEntries = listOf(entry),
+            context = context
+        )
+    }
+    fun playSongFromHistory(
+        entry: UserHistoryEntityModel,
+        historyEntries: List<UserHistoryEntityModel> = listOf(entry),
+        context: Context
+    ) {
+        if (!entry.isSong || entry.s3link.isBlank()) return
+
+        val queueSongs = historyEntries
+            .asSequence()
+            .filter { it.isSong && it.s3link.isNotBlank() }
+            .map { it.toSongModel() }
+            .distinctBy { it.id }
+            .toList()
+
+        if (queueSongs.isEmpty()) return
+
+        val startIndex = queueSongs.indexOfFirst { it.id == entry.entityId }
+        if (startIndex < 0) return
+
+        startSongPlayback(queueSongs, startIndex, entry.subtitle.ifBlank { "History" }, context)
     }
 
     fun playRadioFromHistory(entry: UserHistoryEntityModel, context: Context) {
@@ -686,7 +781,7 @@ class PlayerViewModel @Inject constructor(
         albumId: String = currentSongAlbumId.value
     ) {
         currentSongState.updateSongState(coverUri, title, singer, playingState, songId, songIndex, album, albumTitle, albumId)
-        syncCurrentSongLikeState()
+        syncCurrentMediaLikeState()
         persistCurrentPlaybackSnapshot()
     }
 

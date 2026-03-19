@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -32,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,6 +57,7 @@ import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.viewmodel.HomeViewModel
+import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -81,7 +84,7 @@ fun LibraryScreen(navController: NavController) {
         }
     ) { padding ->
         val libraryViewModel: HomeViewModel = hiltViewModel()
-        val playerViewModel: PlayerViewModel = hiltViewModel()
+        val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
         val albums by libraryViewModel.albums.collectAsState()
         val likedSongIds by playerViewModel.likedSongIds.collectAsState()
         val likedAlbumIds by playerViewModel.likedAlbumIds.collectAsState()
@@ -119,11 +122,14 @@ fun SumUpLibraryScreen(
     likedAlbumIds: Set<String>
 ) {
     val libraryAlbums = getAlbumsByIds(likedAlbumIds, albums)
+    val scrollState = rememberSaveable(saver = ScrollState.Saver) {
+        ScrollState(0)
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(padding)
             .background(Color(AppBackground.toArgb()))
     ) {
