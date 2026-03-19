@@ -41,6 +41,12 @@ fun WebPlayListType.toDomain(): AlbumsModel = AlbumsModel(
     songs = songs.map { it.toDomain() }
 )
 
+fun WebAllPlayListType.toDomain(): AlbumsModel = AlbumsModel(
+    id = id,
+    image = image,
+    title = title
+)
+
 fun WebArtistType.toDomain(): ArtistsModel = ArtistsModel(
     id = id,
     title = title,

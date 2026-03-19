@@ -6,6 +6,7 @@ import com.music.stream.neptune.auth.UserSessionManager
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.PodcastEpisodeModel
 import com.music.stream.neptune.data.entity.PodcastModel
+import com.music.stream.neptune.data.entity.UserHistoryEntityModel
 import com.music.stream.neptune.data.network.PodcastBrowseResponse
 import com.music.stream.neptune.data.network.PodcastEpisodesResponse
 import com.music.stream.neptune.ui.repository.AppRepository
@@ -31,14 +32,6 @@ class PodcastViewModel @Inject constructor(
         MutableStateFlow(Response.Loading())
     val genres: StateFlow<Response<List<String>>> = _genres
 
-    private val _likedPodcasts: MutableStateFlow<Response<List<PodcastModel>>> =
-        MutableStateFlow(Response.Loading())
-    val likedPodcasts: StateFlow<Response<List<PodcastModel>>> = _likedPodcasts
-
-    private val _topPodcastsByActivity: MutableStateFlow<Response<List<PodcastModel>>> =
-        MutableStateFlow(Response.Loading())
-    val topPodcastsByActivity: StateFlow<Response<List<PodcastModel>>> = _topPodcastsByActivity
-
     private val _selectedPodcast: MutableStateFlow<Response<PodcastModel>> =
         MutableStateFlow(Response.Loading())
     val selectedPodcast: StateFlow<Response<PodcastModel>> = _selectedPodcast
@@ -50,6 +43,10 @@ class PodcastViewModel @Inject constructor(
     private val _genrePodcasts: MutableStateFlow<Response<PodcastBrowseResponse>> =
         MutableStateFlow(Response.Loading())
     val genrePodcasts: StateFlow<Response<PodcastBrowseResponse>> = _genrePodcasts
+
+    private val _historyEntries: MutableStateFlow<Response<List<UserHistoryEntityModel>>> =
+        MutableStateFlow(Response.Loading())
+    val historyEntries: StateFlow<Response<List<UserHistoryEntityModel>>> = _historyEntries
 
     private val _isFetchingMoreGenrePodcasts = MutableStateFlow(false)
     val isFetchingMoreGenrePodcasts = _isFetchingMoreGenrePodcasts.asStateFlow()
@@ -69,17 +66,10 @@ class PodcastViewModel @Inject constructor(
     init {
         fetchPodcasts(1)
         fetchGenres()
-        fetchLikedAndTopForCurrentUser()
+        fetchHistory()
     }
 
     private fun currentUserIdOrEmail(): String = userSessionManager.userIdOrEmail()
-
-    fun fetchLikedAndTopForCurrentUser() {
-        val userId = currentUserIdOrEmail()
-        if (userId.isBlank()) return
-        fetchLikedPodcasts(userId)
-        fetchTopPodcastsByUserActivity(userId)
-    }
 
     fun fetchPodcasts(page: Int) = viewModelScope.launch(Dispatchers.IO) {
         repository.provideBrowsePodcasts(page).collect { _podcasts.value = it }
@@ -108,7 +98,7 @@ class PodcastViewModel @Inject constructor(
                     currentGenrePage = incoming.data.page
 
                     if (append && _genrePodcasts.value is Response.Success) {
-                        val existing = (_genrePodcasts.value as Response.Success).data
+                        val existing = (_genrePodcasts.value as Response.Success<PodcastBrowseResponse>).data
                         val merged = (existing.results + incomingResults).distinctBy { it.id }
                         val hasNewItems = merged.size > existing.results.size
                         _hasMoreGenrePodcasts.value = incomingResults.isNotEmpty() && hasNewItems
@@ -136,8 +126,6 @@ class PodcastViewModel @Inject constructor(
                 is Response.Loading -> {
                     if (!append) _genrePodcasts.value = incoming
                 }
-
-                else -> Unit
             }
             if (incoming is Response.Success) {
                 _isFetchingMoreGenrePodcasts.value = false
@@ -166,7 +154,7 @@ class PodcastViewModel @Inject constructor(
                 return@collect
             }
 
-            val oldData = (_episodes.value as Response.Success).data
+            val oldData = (_episodes.value as Response.Success<PodcastEpisodesResponse>).data
             val newData = incoming.data
             val merged = oldData.results + newData.results
             _episodes.value = Response.Success(
@@ -179,23 +167,29 @@ class PodcastViewModel @Inject constructor(
         }
     }
 
-    fun fetchLikedPodcasts(userId: String) = viewModelScope.launch(Dispatchers.IO) {
-        repository.provideUserLikedPodcasts(userId).collect { _likedPodcasts.value = it }
-    }
-
-    fun fetchTopPodcastsByUserActivity(userId: String) = viewModelScope.launch(Dispatchers.IO) {
-        repository.provideTopPodcastsByUserActivity(userId).collect { _topPodcastsByActivity.value = it }
-    }
-
-    fun userLikedPodcasts(userId: String, podcastId: String, episodeId: String) =
-        viewModelScope.launch(Dispatchers.IO) {
-            repository.provideUserLikedPodcastsAction(userId, podcastId, episodeId).collect { }
-        }
-
     fun userListenedPodcasts(userId: String, podcastId: String, duration: Int, episodeId: String) =
         viewModelScope.launch(Dispatchers.IO) {
-            repository.provideUserListenedPodcastsAction(userId, podcastId, duration, episodeId).collect { }
+            val podcastState = _selectedPodcast.value as? Response.Success ?: return@launch
+            val episode = (_episodes.value as? Response.Success)
+                ?.data
+                ?.results
+                ?.firstOrNull { it.id == episodeId }
+                ?: return@launch
+            repository.provideUserListenedPodcastsAction(userId, podcastState.data, episode, duration).collect { }
         }
+
+    fun fetchHistory(page: Int = 1, limit: Int = 20) = viewModelScope.launch(Dispatchers.IO) {
+        val userId = currentUserIdOrEmail()
+        repository.provideUserHistory(userId, page, limit).collect { response ->
+            _historyEntries.value = when (response) {
+                is Response.Success -> Response.Success(
+                    response.data.items.filter { it.isPodcast || it.isPodcastEpisode }
+                )
+                is Response.Loading -> Response.Loading()
+                is Response.Error -> Response.Error(response.error)
+            }
+        }
+    }
 
     fun requestPodcastEpisodesPopulation(userId: String, podcastId: String) =
         viewModelScope.launch(Dispatchers.IO) {
@@ -203,7 +197,7 @@ class PodcastViewModel @Inject constructor(
                 when (result) {
                     is Response.Success -> _actionMessage.value = "Podcast episodes requested successfully"
                     is Response.Error -> _actionMessage.value = "Podcast request failed: ${result.error}"
-                    else -> Unit
+                    is Response.Loading -> Unit
                 }
             }
         }

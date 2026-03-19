@@ -5,27 +5,34 @@ import com.music.stream.neptune.data.entity.AlbumsModel
 import com.music.stream.neptune.data.entity.ArtistsModel
 import com.music.stream.neptune.data.entity.HomePageInfoModel
 import com.music.stream.neptune.data.entity.HomePageSectionModel
-import com.music.stream.neptune.data.entity.QueueUpdateModel
 import com.music.stream.neptune.data.entity.PodcastEpisodeModel
 import com.music.stream.neptune.data.entity.PodcastModel
+import com.music.stream.neptune.data.entity.PaginatedItems
 import com.music.stream.neptune.data.entity.RadioCountryAggModel
 import com.music.stream.neptune.data.entity.RadioGenreAggModel
 import com.music.stream.neptune.data.entity.RadioStationModel
 import com.music.stream.neptune.data.entity.SearchResultModel
 import com.music.stream.neptune.data.entity.SongsModel
+import com.music.stream.neptune.data.entity.UserHistoryEntityModel
+import com.music.stream.neptune.data.entity.UserHistoryPageModel
+import com.music.stream.neptune.data.entity.UserLikedEntityModel
+import com.music.stream.neptune.data.entity.UserLikesPageModel
 import com.music.stream.neptune.data.entity.UserModel
 import com.music.stream.neptune.data.entity.UserPlaylistModel
 import com.music.stream.neptune.data.entity.web.toDomain
-import com.music.stream.neptune.data.network.QueueSongResponse
-import com.music.stream.neptune.data.network.AddMultipleTracksRequest
 import com.music.stream.neptune.data.network.AddSongToPlaylistRequest
 import com.music.stream.neptune.data.network.ArtistSongsPaginationResponse
 import com.music.stream.neptune.data.network.CreatePlaylistRequest
+import com.music.stream.neptune.data.network.HistoryEntityResponseDto
+import com.music.stream.neptune.data.network.LikeEntityRequest
+import com.music.stream.neptune.data.network.LikedEntityResponseDto
 import com.music.stream.neptune.data.network.NetworkApi
 import com.music.stream.neptune.data.network.PodcastBrowseResponse
 import com.music.stream.neptune.data.network.PodcastEpisodesResponse
 import com.music.stream.neptune.data.network.SongsPageResponse
 import com.music.stream.neptune.data.network.StationsBrowseResponse
+import com.music.stream.neptune.data.network.AlbumsBrowseResponse
+import com.music.stream.neptune.data.network.UpdateHistoryRequest
 import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
@@ -47,13 +54,41 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
     private var cachedSongs: List<SongsModel>? = null
     private var cachedUser: UserModel? = null
     private val likedSongIds = MutableStateFlow<Set<String>>(emptySet())
+        private val likedAlbumIds = MutableStateFlow<Set<String>>(emptySet())
 
     fun observeLikedSongIds(): StateFlow<Set<String>> = likedSongIds.asStateFlow()
+        fun observeLikedAlbumIds(): StateFlow<Set<String>> = likedAlbumIds.asStateFlow()
 
     fun clearCachedUser() {
         cachedUser = null
         likedSongIds.value = emptySet()
+            likedAlbumIds.value = emptySet()
     }
+
+    private fun LikedEntityResponseDto.toDomain(): UserLikedEntityModel = UserLikedEntityModel(
+        entityId = entityId,
+        entityType = entityType,
+        title = title,
+        image = image.orEmpty(),
+        s3link = s3link.orEmpty(),
+        subtitle = albumName ?: podcastName.orEmpty(),
+        episodeNumber = episodeNumber,
+        likedAt = likedAt
+    )
+
+    private fun HistoryEntityResponseDto.toDomain(): UserHistoryEntityModel = UserHistoryEntityModel(
+        entityId = entityId,
+        entityType = entityType,
+        title = title,
+        image = image.orEmpty(),
+        s3link = s3link.orEmpty(),
+        subtitle = albumName ?: podcastName.orEmpty(),
+        episodeNumber = episodeNumber,
+        watchedDuration = watchedDuration,
+        totalDuration = totalDuration,
+        watchedPercentage = watchedPercentage,
+        lastPlayedAt = lastPlayedAt
+    )
 
     fun updateCachedSongLike(userId: String, trackId: String, liked: Boolean) {
         if (userId.isBlank() || trackId.isBlank()) return
@@ -68,6 +103,15 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
             cachedUser = existing.copy(likedSongs = nextIds.toList())
         }
     }
+
+        fun updateCachedAlbumLike(albumId: String, liked: Boolean) {
+            if (albumId.isBlank()) return
+
+            val nextIds = likedAlbumIds.value.toMutableSet().apply {
+                if (liked) add(albumId) else remove(albumId)
+            }
+            likedAlbumIds.value = nextIds
+        }
 
     suspend fun getUserById(userId: String): Flow<Response<UserModel>> = flow {
         emit(Response.Loading())
@@ -91,6 +135,86 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
             emit(Response.Success(user))
         } catch (e: Exception) {
             Log.e("Api", "Error fetching user $userId: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    suspend fun refreshLikedSongs(userId: String, limit: Int = 100): Flow<Response<Set<String>>> = flow {
+        emit(Response.Loading())
+        try {
+            if (userId.isBlank()) {
+                likedSongIds.value = emptySet()
+                likedAlbumIds.value = emptySet()
+                emit(Response.Success(emptySet()))
+                return@flow
+            }
+
+            val likes = networkApi.getUserLikes(userId, page = 1, limit = limit)
+            val ids = likes.items
+                .filter { it.entityType == "song" }
+                .map { it.entityId }
+                .toSet()
+                val albumIds = likes.items
+                    .filter { it.entityType == "album" }
+                    .map { it.entityId }
+                    .toSet()
+            likedSongIds.value = ids
+                likedAlbumIds.value = albumIds
+            emit(Response.Success(ids))
+        } catch (e: Exception) {
+            Log.e("Api", "Error refreshing liked songs: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    suspend fun getUserLikes(userId: String, page: Int, limit: Int): Flow<Response<UserLikesPageModel>> = flow {
+        emit(Response.Loading())
+        try {
+            if (userId.isBlank()) {
+                emit(Response.Success(UserLikesPageModel()))
+                return@flow
+            }
+
+            val result = networkApi.getUserLikes(userId, page, limit)
+            emit(
+                Response.Success(
+                    PaginatedItems(
+                        items = result.items.map { it.toDomain() },
+                        total = result.total,
+                        page = result.page,
+                        limit = result.limit,
+                        hasMore = result.hasMore
+                    )
+                )
+            )
+        } catch (e: Exception) {
+            Log.e("Api", "Error fetching user likes: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    suspend fun getUserHistory(userId: String, page: Int, limit: Int): Flow<Response<UserHistoryPageModel>> = flow {
+        emit(Response.Loading())
+        try {
+            if (userId.isBlank()) {
+                emit(Response.Success(UserHistoryPageModel()))
+                return@flow
+            }
+
+            val result = networkApi.getUserHistory(userId, page, limit)
+            emit(
+                Response.Success(
+                    PaginatedItems(
+                        items = result.items.map { it.toDomain() },
+                        total = result.total,
+                        page = result.page,
+                        limit = result.limit,
+                        hasMore = result.hasMore
+                    )
+                )
+            )
+        } catch (e: Exception) {
+            Log.e("Api", "Error fetching user history: ${e.message}")
             emit(Response.Error(e.message ?: "Unknown error"))
         }
     }
@@ -185,14 +309,32 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
                 emit(Response.Success(cached))
                 return@flow
             }
-            // Load all songs from fresh albums (embedded in each album)
-            val albums = cachedAlbums ?: networkApi.getFreshAlbums().map { it.toDomain() }.also { cachedAlbums = it }
-            val songs = albums.flatMap { it.songs }.distinctBy { it.id }
+            val songs = networkApi.getAllAvailableSongs(0, 500).results.map { it.toDomain() }.distinctBy { it.id }
             cachedSongs = songs
-            Log.d("Api", "Derived ${songs.size} songs from ${albums.size} albums")
+            Log.d("Api", "Fetched ${songs.size} songs from available songs endpoint")
             emit(Response.Success(songs))
         } catch (e: Exception) {
             Log.e("Api", "Error fetching songs: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    suspend fun getAllAlbums(page: Int): Flow<Response<AlbumsBrowseResponse>> = flow {
+        emit(Response.Loading())
+        try {
+            val result = networkApi.getAllAlbums(page)
+            val mappedAlbums = result.results.map { it.toDomain() }
+            emit(
+                Response.Success(
+                    AlbumsBrowseResponse(
+                        results = mappedAlbums,
+                        page = result.page,
+                        total = mappedAlbums.size
+                    )
+                )
+            )
+        } catch (e: Exception) {
+            Log.e("Api", "Error fetching all albums page=$page: ${e.message}")
             emit(Response.Error(e.message ?: "Unknown error"))
         }
     }
@@ -277,23 +419,6 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
-    // ── Available tracks ──────────────────────────────────────────────────────
-    suspend fun getAllSongs(page: Int, limit: Int): Flow<Response<SongsPageResponse>> = flow {
-        emit(Response.Loading())
-        try {
-            val result = networkApi.getAllSongs(page, limit)
-            val mapped = SongsPageResponse(
-                results = result.results.map { it.toDomain() },
-                page = result.page,
-                total = result.total
-            )
-            emit(Response.Success(mapped))
-        } catch (e: Exception) {
-            Log.e("Api", "Error fetching all songs page=$page: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
     suspend fun getAllAvailableSongs(skip: Int, limit: Int): Flow<Response<SongsPageResponse>> = flow {
         emit(Response.Loading())
         try {
@@ -310,57 +435,6 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
-    suspend fun addPlaylistToQueue(userId: String, trackIds: List<String>): Flow<Response<Boolean>> = flow {
-        emit(Response.Loading())
-        try {
-            val response = networkApi.addPlaylistToQueue(userId, AddMultipleTracksRequest(songs = trackIds))
-            if (response.isSuccessful) {
-                emit(Response.Success(true))
-            } else {
-                emit(Response.Error("Queue sync failed with HTTP ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Log.e("Api", "Error adding playlist to queue: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
-    suspend fun getNextQueueItem(userId: String): Flow<Response<QueueUpdateModel>> = flow {
-        emit(Response.Loading())
-        try {
-            val result = networkApi.getNextQueueItem(userId)
-            emit(
-                Response.Success(
-                    QueueUpdateModel(
-                        song = result.song.toDomain(),
-                        updatedQueue = result.updated_queue.map { it.toDomain() }
-                    )
-                )
-            )
-        } catch (e: Exception) {
-            Log.e("Api", "Error fetching next queue item: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
-    suspend fun getPrevQueueItem(userId: String): Flow<Response<QueueUpdateModel>> = flow {
-        emit(Response.Loading())
-        try {
-            val result = networkApi.getPrevQueueItem(userId)
-            emit(
-                Response.Success(
-                    QueueUpdateModel(
-                        song = result.song.toDomain(),
-                        updatedQueue = result.updated_queue.map { it.toDomain() }
-                    )
-                )
-            )
-        } catch (e: Exception) {
-            Log.e("Api", "Error fetching prev queue item: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
     suspend fun requestTrackAddition(userId: String, songId: String): Flow<Response<Boolean>> = flow {
         emit(Response.Loading())
         try {
@@ -372,22 +446,29 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
-    private fun QueueSongResponse.toDomain(): SongsModel = SongsModel(
-        id = id,
-        name = name,
-        artists = artists.map { artistId -> SongsModel.ArtistRef(id = artistId) },
-        duration = duration_ms,
-        genres = genres,
-        album = SongsModel.AlbumRef(title = album, id = album_id),
-        thumbnail = thumbnail,
-        preview_url = preview_url.orEmpty(),
-        s3link = s3link.orEmpty()
-    )
-
-    suspend fun likeDislikeSong(userId: String, likeDislike: Boolean, trackId: String): Flow<Response<Boolean>> = flow {
+    suspend fun likeDislikeSong(userId: String, likeDislike: Boolean, song: SongsModel): Flow<Response<Boolean>> = flow {
         emit(Response.Loading())
         try {
-            networkApi.likeDislikeSong(userId, trackId, likeDislike)
+            if (song.id.isBlank()) {
+                emit(Response.Error("Song id is missing"))
+                return@flow
+            }
+            if (likeDislike) {
+                networkApi.likeEntity(
+                    userId,
+                    song.id,
+                    LikeEntityRequest(
+                        entityId = song.id,
+                        entityType = "song",
+                        title = song.title,
+                        image = song.coverUri.takeIf { it.isNotBlank() },
+                        s3link = song.s3link.takeIf { it.isNotBlank() },
+                        albumName = song.album.title.takeIf { it.isNotBlank() }
+                    )
+                )
+            } else {
+                networkApi.unlikeEntity(userId, song.id)
+            }
             emit(Response.Success(true))
         } catch (e: Exception) {
             Log.e("Api", "Error like/dislike song: ${e.message}")
@@ -395,27 +476,34 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
-    suspend fun likeDislikeRadio(userId: String, likeDislike: Boolean, trackId: String): Flow<Response<Boolean>> = flow {
-        emit(Response.Loading())
-        try {
-            networkApi.likeDislikeRadio(userId, trackId, likeDislike)
-            emit(Response.Success(true))
-        } catch (e: Exception) {
-            Log.e("Api", "Error like/dislike radio: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
+        suspend fun likeDislikeAlbum(userId: String, likeDislike: Boolean, album: AlbumsModel): Flow<Response<Boolean>> = flow {
+            emit(Response.Loading())
+            try {
+                if (album.id.isBlank()) {
+                    emit(Response.Error("Album id is missing"))
+                    return@flow
+                }
+                if (likeDislike) {
+                    networkApi.likeEntity(
+                        userId,
+                        album.id,
+                        LikeEntityRequest(
+                            entityId = album.id,
+                            entityType = "album",
+                            title = album.title,
+                            image = album.image.takeIf { it.isNotBlank() },
+                            albumName = album.title.takeIf { it.isNotBlank() }
+                        )
+                    )
+                } else {
+                    networkApi.unlikeEntity(userId, album.id)
+                }
+                emit(Response.Success(true))
+            } catch (e: Exception) {
+                Log.e("Api", "Error like/dislike album: ${e.message}")
+                emit(Response.Error(e.message ?: "Unknown error"))
+            }
         }
-    }
-
-    suspend fun likeDislikePodcast(userId: String, likeDislike: Boolean, trackId: String): Flow<Response<Boolean>> = flow {
-        emit(Response.Loading())
-        try {
-            networkApi.likeDislikePodcast(userId, trackId, likeDislike)
-            emit(Response.Success(true))
-        } catch (e: Exception) {
-            Log.e("Api", "Error like/dislike podcast: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
 
     // ── Podcast ───────────────────────────────────────────────────────────────
     suspend fun browsePodcasts(page: Int): Flow<Response<PodcastBrowseResponse>> = flow {
@@ -482,49 +570,37 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
-    suspend fun getUserLikedPodcasts(userId: String): Flow<Response<List<PodcastModel>>> = flow {
-        emit(Response.Loading())
-        try {
-            val result = networkApi.getUserLikedPodcasts(userId).map { it.toDomain() }
-            emit(Response.Success(result))
-        } catch (e: Exception) {
-            Log.e("Api", "Error fetching liked podcasts: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
-    suspend fun topPodcastsByUserActivity(userId: String): Flow<Response<List<PodcastModel>>> = flow {
-        emit(Response.Loading())
-        try {
-            val result = networkApi.topPodcastsByUserActivity(userId).map { it.toDomain() }
-            emit(Response.Success(result))
-        } catch (e: Exception) {
-            Log.e("Api", "Error fetching top podcasts by activity: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
-    suspend fun userLikedPodcasts(userId: String, podcastId: String, episodeId: String): Flow<Response<Boolean>> = flow {
-        emit(Response.Loading())
-        try {
-            networkApi.userLikedPodcasts(userId, podcastId, episodeId)
-            emit(Response.Success(true))
-        } catch (e: Exception) {
-            Log.e("Api", "Error liking podcast: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
     suspend fun userListenedPodcasts(
         userId: String,
-        podcastId: String,
+        podcast: PodcastModel,
+        episode: PodcastEpisodeModel,
         duration: Int,
-        episodeId: String
-    ): Flow<Response<List<PodcastModel>>> = flow {
+    ): Flow<Response<Boolean>> = flow {
         emit(Response.Loading())
         try {
-            val result = networkApi.userListenedPodcasts(userId, podcastId, episodeId, duration).map { it.toDomain() }
-            emit(Response.Success(result))
+            val totalDuration = episode.duration.coerceAtLeast(0)
+            val watchedPercentage = if (totalDuration > 0) {
+                ((duration.toDouble() / totalDuration.toDouble()) * 100.0).toInt().coerceIn(0, 100)
+            } else {
+                0
+            }
+            networkApi.updateHistory(
+                userId = userId,
+                entityId = episode.id,
+                body = UpdateHistoryRequest(
+                    entityId = episode.id,
+                    entityType = "podcast_episode",
+                    title = episode.title,
+                    image = episode.thumbnail.takeIf { it.isNotBlank() } ?: podcast.image.takeIf { it.isNotBlank() },
+                    s3link = episode.s3link.takeIf { it.isNotBlank() } ?: episode.preview_url.takeIf { it.isNotBlank() },
+                    podcastName = podcast.title.takeIf { it.isNotBlank() },
+                    episodeNumber = episode.episode_number.takeIf { it > 0 },
+                    watchedDuration = duration.coerceAtLeast(0),
+                    totalDuration = totalDuration,
+                    watchedPercentage = watchedPercentage
+                )
+            )
+            emit(Response.Success(true))
         } catch (e: Exception) {
             Log.e("Api", "Error sending podcast listened event: ${e.message}")
             emit(Response.Error(e.message ?: "Unknown error"))
@@ -591,46 +667,57 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
-    suspend fun getTrendingStations(country: String): Flow<Response<List<RadioStationModel>>> = flow {
+    suspend fun userListenedStation(userId: String, station: RadioStationModel, duration: Int): Flow<Response<Boolean>> = flow {
         emit(Response.Loading())
         try {
-            val result = networkApi.getTrendingStations(country).map { it.toDomain() }
-            emit(Response.Success(result))
-        } catch (e: Exception) {
-            Log.e("Api", "Error fetching trending stations: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
-    suspend fun getUserLikedStations(userId: String): Flow<Response<List<RadioStationModel>>> = flow {
-        emit(Response.Loading())
-        try {
-            val result = networkApi.getUserLikedStations(userId).map { it.toDomain() }
-            emit(Response.Success(result))
-        } catch (e: Exception) {
-            Log.e("Api", "Error fetching liked stations: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
-    suspend fun getLastPlayedStations(userId: String): Flow<Response<List<RadioStationModel>>> = flow {
-        emit(Response.Loading())
-        try {
-            val result = networkApi.getLastPlayedStations(userId).map { it.toDomain() }
-            emit(Response.Success(result))
-        } catch (e: Exception) {
-            Log.e("Api", "Error fetching last played stations: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
-    suspend fun userListenedStation(userId: String, stationId: String, duration: Int): Flow<Response<Boolean>> = flow {
-        emit(Response.Loading())
-        try {
-            networkApi.userListenedStation(userId, stationId, duration)
+            networkApi.updateHistory(
+                userId = userId,
+                entityId = station.id,
+                body = UpdateHistoryRequest(
+                    entityId = station.id,
+                    entityType = "radio_station",
+                    title = station.name,
+                    image = station.coverUri.takeIf { it.isNotBlank() },
+                    s3link = station.stream_url.takeIf { it.isNotBlank() },
+                    watchedDuration = duration.coerceAtLeast(0),
+                    totalDuration = 0,
+                    watchedPercentage = 0
+                )
+            )
             emit(Response.Success(true))
         } catch (e: Exception) {
             Log.e("Api", "Error sending station listened event: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    suspend fun userPlayedSong(userId: String, song: SongsModel, duration: Int): Flow<Response<Boolean>> = flow {
+        emit(Response.Loading())
+        try {
+            val totalDuration = song.duration.coerceAtLeast(0)
+            val watchedPercentage = if (totalDuration > 0) {
+                ((duration.toDouble() / totalDuration.toDouble()) * 100.0).toInt().coerceIn(0, 100)
+            } else {
+                0
+            }
+            networkApi.updateHistory(
+                userId = userId,
+                entityId = song.id,
+                body = UpdateHistoryRequest(
+                    entityId = song.id,
+                    entityType = "song",
+                    title = song.title,
+                    image = song.coverUri.takeIf { it.isNotBlank() },
+                    s3link = song.s3link.takeIf { it.isNotBlank() },
+                    albumName = song.album.title.takeIf { it.isNotBlank() },
+                    watchedDuration = duration.coerceAtLeast(0),
+                    totalDuration = totalDuration,
+                    watchedPercentage = watchedPercentage
+                )
+            )
+            emit(Response.Success(true))
+        } catch (e: Exception) {
+            Log.e("Api", "Error sending song played event: ${e.message}")
             emit(Response.Error(e.message ?: "Unknown error"))
         }
     }
@@ -690,28 +777,6 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
             emit(Response.Success(result))
         } catch (e: Exception) {
             Log.e("Api", "Error fetching playlist collection $id: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
-    suspend fun getEditorsPlayList(limit: Int): Flow<Response<HomePageSectionModel>> = flow {
-        emit(Response.Loading())
-        try {
-            val result = networkApi.getEditorsPlayList(limit).toDomain()
-            emit(Response.Success(result))
-        } catch (e: Exception) {
-            Log.e("Api", "Error fetching editor playlists: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
-    suspend fun getLatestPlaylistCollections(): Flow<Response<List<AlbumsModel>>> = flow {
-        emit(Response.Loading())
-        try {
-            val result = networkApi.getLatestPlaylistCollections().results.map { it.toDomain() }
-            emit(Response.Success(result))
-        } catch (e: Exception) {
-            Log.e("Api", "Error fetching latest playlist collections: ${e.message}")
             emit(Response.Error(e.message ?: "Unknown error"))
         }
     }

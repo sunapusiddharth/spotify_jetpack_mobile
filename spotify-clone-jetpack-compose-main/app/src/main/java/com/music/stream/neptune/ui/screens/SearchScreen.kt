@@ -61,9 +61,6 @@ import com.music.stream.neptune.R
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.SearchCardModel
 import com.music.stream.neptune.data.entity.SongsModel
-import com.music.stream.neptune.data.preferences.addLikedSongId
-import com.music.stream.neptune.data.preferences.isSongLiked
-import com.music.stream.neptune.data.preferences.removeLikedSongId
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.components.StaggeredReveal
@@ -73,6 +70,7 @@ import com.music.stream.neptune.ui.components.unavailableArtworkColorFilter
 import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
+import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.SearchViewModel
 import kotlinx.coroutines.delay
 
@@ -86,6 +84,7 @@ enum class SearchFilter(val label: String, val apiType: String) {
 @Composable
 fun SearchScreen(navController: NavController) {
     val searchViewModel: SearchViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = hiltViewModel()
     val songs by searchViewModel.songs.collectAsState()
 
     Surface(
@@ -103,14 +102,16 @@ fun SearchScreen(navController: NavController) {
                 SumUpSearchScreen(
                     navController = navController,
                     localSongs = songsPool,
-                    searchViewModel = searchViewModel
+                    searchViewModel = searchViewModel,
+                    playerViewModel = playerViewModel
                 )
             }
             is Response.Error -> {
                 SumUpSearchScreen(
                     navController = navController,
                     localSongs = emptyList(),
-                    searchViewModel = searchViewModel
+                    searchViewModel = searchViewModel,
+                    playerViewModel = playerViewModel
                 )
             }
         }
@@ -122,7 +123,8 @@ fun SearchScreen(navController: NavController) {
 fun SumUpSearchScreen(
     navController: NavController,
     localSongs: List<SongsModel>,
-    searchViewModel: SearchViewModel
+    searchViewModel: SearchViewModel,
+    playerViewModel: PlayerViewModel
 ) {
     val context = LocalContext.current
     var text by remember { mutableStateOf("") }
@@ -207,6 +209,7 @@ fun SumUpSearchScreen(
                 }
                 is Response.Success -> {
                     val cards = result.data.cards
+                    val searchSongQueue = cards.filter { it.type == "songs" && it.hasPlayableAudio }.map { it.toSongsModel() }
                     if (cards.isEmpty()) {
                         item {
                             Box(
@@ -243,7 +246,8 @@ fun SumUpSearchScreen(
                                 TopResultCard(
                                     card = topResult,
                                     navController = navController,
-                                    searchViewModel = searchViewModel,
+                                    playerViewModel = playerViewModel,
+                                    songQueue = searchSongQueue,
                                     context = context,
                                     revealIndex = 0,
                                     modifier = Modifier.weight(1f)
@@ -263,7 +267,8 @@ fun SumUpSearchScreen(
                                         songCards.take(4).forEachIndexed { index, song ->
                                             SearchSongMiniRow(
                                                 card = song,
-                                                searchViewModel = searchViewModel,
+                                                playerViewModel = playerViewModel,
+                                                songQueue = searchSongQueue,
                                                 context = context,
                                                 revealIndex = index + 1
                                             )
@@ -309,27 +314,27 @@ fun SumUpSearchScreen(
                                 SearchSectionHeader("All Songs")
                             }
                             items(songCards.size) { i ->
-                                SearchCardRow(songCards[i], navController, searchViewModel, context, revealIndex = i)
+                                SearchCardRow(songCards[i], navController, playerViewModel, searchSongQueue, context, revealIndex = i)
                             }
                         }
 
                     } else {
                         // ── Filtered: flat list ─────────────────────────────
                         items(cards.size) { i ->
-                            SearchCardRow(cards[i], navController, searchViewModel, context, revealIndex = i)
+                            SearchCardRow(cards[i], navController, playerViewModel, searchSongQueue, context, revealIndex = i)
                         }
                     }
                 }
                 is Response.Error -> {
                     items(localFiltered.size) { i ->
-                        LocalSongRow(localFiltered[i], searchViewModel, context, revealIndex = i)
+                        LocalSongRow(localFiltered[i], localFiltered, playerViewModel, context, revealIndex = i)
                     }
                 }
                 else -> {}
             }
         } else if (text.isBlank()) {
             items(localFiltered.size) { i ->
-                LocalSongRow(localFiltered[i], searchViewModel, context, revealIndex = i)
+                LocalSongRow(localFiltered[i], localFiltered, playerViewModel, context, revealIndex = i)
             }
         }
 
@@ -344,7 +349,8 @@ fun SumUpSearchScreen(
 fun TopResultCard(
     card: SearchCardModel,
     navController: NavController,
-    searchViewModel: SearchViewModel,
+    playerViewModel: PlayerViewModel,
+    songQueue: List<SongsModel>,
     context: android.content.Context,
     revealIndex: Int,
     modifier: Modifier = Modifier
@@ -367,16 +373,13 @@ fun TopResultCard(
                         "album" -> navController.navigate("${Routes.Album.route}/${card.id}")
                         "artist" -> navController.navigate("${Routes.Artist.route}/${card.id}")
                         "songs" -> if (card.hasPlayableAudio) {
-                            SongPlayer.playSong(
-                                SongPlayer.buildSongStreamUrl(card.s3link),
-                                context,
-                                card.name,
-                                card.artist,
-                                card.image
-                            )
-                            searchViewModel.updateSongState(
-                                coverUri = card.image, title = card.name,
-                                singer = card.artist, playingState = true, songId = card.id
+                            val queue = if (songQueue.isNotEmpty()) songQueue else listOf(card.toSongsModel())
+                            val startIndex = queue.indexOfFirst { it.id == card.id }.coerceAtLeast(0)
+                            playerViewModel.startSongPlayback(
+                                queueSongs = queue,
+                                startIndex = startIndex,
+                                album = "Search",
+                                context = context
                             )
                         }
                     }
@@ -467,7 +470,8 @@ fun TopResultCard(
 @Composable
 fun SearchSongMiniRow(
     card: SearchCardModel,
-    searchViewModel: SearchViewModel,
+    playerViewModel: PlayerViewModel,
+    songQueue: List<SongsModel>,
     context: android.content.Context,
     revealIndex: Int
 ) {
@@ -487,16 +491,13 @@ fun SearchSongMiniRow(
                     indication = null
                 ) {
                     if (isPlayable) {
-                        SongPlayer.playSong(
-                            SongPlayer.buildSongStreamUrl(card.s3link),
-                            context,
-                            card.name,
-                            card.artist,
-                            card.image
-                        )
-                        searchViewModel.updateSongState(
-                            coverUri = card.image, title = card.name,
-                            singer = card.artist, playingState = true, songId = card.id
+                        val queue = if (songQueue.isNotEmpty()) songQueue else listOf(card.toSongsModel())
+                        val startIndex = queue.indexOfFirst { it.id == card.id }.coerceAtLeast(0)
+                        playerViewModel.startSongPlayback(
+                            queueSongs = queue,
+                            startIndex = startIndex,
+                            album = "Search",
+                            context = context
                         )
                     }
                 }
@@ -659,7 +660,8 @@ fun SearchAlbumCard(card: SearchCardModel, navController: NavController, revealI
 fun SearchCardRow(
     card: SearchCardModel,
     navController: NavController,
-    searchViewModel: SearchViewModel,
+    playerViewModel: PlayerViewModel,
+    songQueue: List<SongsModel>,
     context: android.content.Context,
     revealIndex: Int
 ) {
@@ -683,16 +685,13 @@ fun SearchCardRow(
                         "album" -> navController.navigate("${Routes.Album.route}/${card.id}")
                         "artist" -> navController.navigate("${Routes.Artist.route}/${card.id}")
                         "songs" -> if (card.hasPlayableAudio) {
-                            SongPlayer.playSong(
-                                SongPlayer.buildSongStreamUrl(card.s3link),
-                                context,
-                                card.name,
-                                card.artist,
-                                card.image
-                            )
-                            searchViewModel.updateSongState(
-                                coverUri = card.image, title = card.name,
-                                singer = card.artist, playingState = true, songId = card.id
+                            val queue = if (songQueue.isNotEmpty()) songQueue else listOf(card.toSongsModel())
+                            val startIndex = queue.indexOfFirst { it.id == card.id }.coerceAtLeast(0)
+                            playerViewModel.startSongPlayback(
+                                queueSongs = queue,
+                                startIndex = startIndex,
+                                album = "Search",
+                                context = context
                             )
                         }
                     }
@@ -759,13 +758,13 @@ fun SearchCardRow(
 @Composable
 fun LocalSongRow(
     song: SongsModel,
-    searchViewModel: SearchViewModel,
+    localQueue: List<SongsModel>,
+    playerViewModel: PlayerViewModel,
     context: android.content.Context,
     revealIndex: Int
 ) {
-    var isLiked by remember { mutableStateOf(isSongLiked(context, song.id)) }
-    val likeState = searchViewModel.likeState.value
-    LaunchedEffect(likeState) { isLiked = isSongLiked(context, song.id) }
+    val likedSongIds by playerViewModel.likedSongIds.collectAsState()
+    val isLiked = likedSongIds.contains(song.id)
     val interactionSource = remember { MutableInteractionSource() }
     val likeScale by animateFloatAsState(
         targetValue = if (isLiked) 1.16f else 1f,
@@ -773,7 +772,7 @@ fun LocalSongRow(
         label = "searchLikeScale"
     )
 
-    val isPlaying = song.id == searchViewModel.currentSongId.value
+    val isPlaying = song.id == playerViewModel.currentSongId.value
     val isPlayable = song.hasPlayableAudio
     val textColor = if (isPlaying) Color(AppPalette.toArgb()) else Color.White
 
@@ -790,8 +789,13 @@ fun LocalSongRow(
                     interactionSource = interactionSource,
                     indication = null
                 ) {
-                    SongPlayer.playSong(song, context)
-                    searchViewModel.updateSongState(song.thumbnail, song.name, song.singer, true, song.id)
+                    val startIndex = localQueue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                    playerViewModel.startSongPlayback(
+                        queueSongs = localQueue,
+                        startIndex = startIndex,
+                        album = song.album.title.ifBlank { "Search" },
+                        context = context
+                    )
                 }
         ) {
             Row(
@@ -844,10 +848,7 @@ fun LocalSongRow(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) {
-                        if (isLiked) removeLikedSongId(context, song.id)
-                        else addLikedSongId(context, song.id)
-                        isLiked = isSongLiked(context, song.id)
-                        searchViewModel.updateLikeState(!searchViewModel.likeState.value)
+                        playerViewModel.toggleSongLike(song.id)
                     },
                 painter = if (isLiked) painterResource(R.drawable.added) else painterResource(R.drawable.ic_add),
                 tint = if (isLiked) Color.White else Color.Gray,
@@ -855,6 +856,17 @@ fun LocalSongRow(
             )
         }
     }
+}
+
+private fun SearchCardModel.toSongsModel(): SongsModel {
+    return SongsModel(
+        id = id,
+        name = name,
+        artists = listOf(SongsModel.ArtistRef(title = artist)),
+        thumbnail = image,
+        preview_url = play_url,
+        s3link = s3link
+    )
 }
 
 // ─── Search Bar ───────────────────────────────────────────────────────────────

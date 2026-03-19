@@ -11,6 +11,7 @@ import com.music.stream.neptune.data.entity.HomePageSectionModel
 import com.music.stream.neptune.data.entity.PodcastModel
 import com.music.stream.neptune.data.entity.RadioStationModel
 import com.music.stream.neptune.data.entity.SongsModel
+import com.music.stream.neptune.data.entity.UserHistoryEntityModel
 import com.music.stream.neptune.data.network.SongsPageResponse
 import com.music.stream.neptune.ui.repository.AppRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -50,13 +51,13 @@ class HomeViewModel @Inject constructor(
         MutableStateFlow(Response.Loading())
     val topStations: StateFlow<Response<List<RadioStationModel>>> = _topStations
 
-    private val _editorsPlayList: MutableStateFlow<Response<HomePageSectionModel>> =
-        MutableStateFlow(Response.Loading())
-    val editorsPlayList: StateFlow<Response<HomePageSectionModel>> = _editorsPlayList
-
     private val _topPodcasts: MutableStateFlow<Response<List<PodcastModel>>> =
         MutableStateFlow(Response.Loading())
     val topPodcasts: StateFlow<Response<List<PodcastModel>>> = _topPodcasts
+
+    private val _historyEntries: MutableStateFlow<Response<List<UserHistoryEntityModel>>> =
+        MutableStateFlow(Response.Loading())
+    val historyEntries: StateFlow<Response<List<UserHistoryEntityModel>>> = _historyEntries
 
     private val _availableSongsPage: MutableStateFlow<Response<SongsPageResponse>> =
         MutableStateFlow(Response.Loading())
@@ -67,24 +68,34 @@ class HomeViewModel @Inject constructor(
         MutableStateFlow(Response.Loading())
     val topScoringSongs: StateFlow<Response<List<SongsModel>>> = _topScoringSongs
 
-    private val _latestPlaylistCollections: MutableStateFlow<Response<List<AlbumsModel>>> =
-        MutableStateFlow(Response.Loading())
-    val latestPlaylistCollections: StateFlow<Response<List<AlbumsModel>>> = _latestPlaylistCollections
-
     init {
-        fetchHomePage()
+        fetchInitialHomePages()
+        fetchUserHistory()
         fetchArtists()
         fetchTopStations()
-        fetchEditorsPlayList()
         fetchTopScoringSongsForUser()
         fetchTopPodcasts()
     }
 
     private fun currentUserIdOrEmail(): String = userSessionManager.userIdOrEmail()
 
+    private fun fetchInitialHomePages() = viewModelScope.launch(Dispatchers.IO) {
+        fetchHomePageInternal(page = 1, reset = true)
+        if (_hasMoreHomePages.value) {
+            fetchHomePageInternal(page = 2, reset = false)
+        }
+        if (_hasMoreHomePages.value) {
+            fetchHomePageInternal(page = 3, reset = false)
+        }
+    }
+
     fun fetchHomePage(page: Int = 1, reset: Boolean = page == 1) = viewModelScope.launch(Dispatchers.IO) {
-        if (_isLoadingNextHomePage.value) return@launch
-        if (!reset && !_hasMoreHomePages.value) return@launch
+        fetchHomePageInternal(page = page, reset = reset)
+    }
+
+    private suspend fun fetchHomePageInternal(page: Int = 1, reset: Boolean = page == 1) {
+        if (_isLoadingNextHomePage.value) return
+        if (!reset && !_hasMoreHomePages.value) return
 
         if (reset) {
             loadedHomeSections.clear()
@@ -169,6 +180,16 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun fetchUserHistory(page: Int = 1, limit: Int = 20) = viewModelScope.launch(Dispatchers.IO) {
+        repository.provideUserHistory(currentUserIdOrEmail(), page, limit).collect { response ->
+            _historyEntries.value = when (response) {
+                is Response.Success -> Response.Success(response.data.items)
+                is Response.Loading -> Response.Loading()
+                is Response.Error -> Response.Error(response.error)
+            }
+        }
+    }
+
     private fun fetchTopStations(country: String = "US", page: Int = 1) = viewModelScope.launch(Dispatchers.IO) {
         repository.provideBrowseStations(country, page).collect { response ->
             _topStations.value = when (response) {
@@ -176,12 +197,6 @@ class HomeViewModel @Inject constructor(
                 is Response.Success -> Response.Success(response.data.results)
                 is Response.Error -> Response.Error(response.error)
             }
-        }
-    }
-
-    private fun fetchEditorsPlayList(limit: Int = 10) = viewModelScope.launch(Dispatchers.IO) {
-        repository.provideEditorsPlayList(limit).collect { section ->
-            _editorsPlayList.value = section
         }
     }
 
@@ -210,12 +225,6 @@ class HomeViewModel @Inject constructor(
     fun fetchAvailableSongs(skip: Int = 0, limit: Int = 100) = viewModelScope.launch(Dispatchers.IO) {
         repository.provideAllAvailableSongs(skip, limit).collect { response ->
             _availableSongsPage.value = response
-        }
-    }
-
-    fun fetchLatestPlaylistCollections() = viewModelScope.launch(Dispatchers.IO) {
-        repository.provideLatestPlaylistCollections().collect { collections ->
-            _latestPlaylistCollections.value = collections
         }
     }
 }

@@ -6,6 +6,7 @@ import com.music.stream.neptune.auth.UserSessionManager
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.RadioCountryAggModel
 import com.music.stream.neptune.data.entity.RadioGenreAggModel
+import com.music.stream.neptune.data.entity.toRadioStationModel
 import com.music.stream.neptune.data.entity.RadioStationModel
 import com.music.stream.neptune.data.network.StationsBrowseResponse
 import com.music.stream.neptune.ui.repository.AppRepository
@@ -34,14 +35,6 @@ class RadioViewModel @Inject constructor(
     private val _lastPlayedStations: MutableStateFlow<Response<List<RadioStationModel>>> =
         MutableStateFlow(Response.Loading())
     val lastPlayedStations: StateFlow<Response<List<RadioStationModel>>> = _lastPlayedStations
-
-    private val _likedStations: MutableStateFlow<Response<List<RadioStationModel>>> =
-        MutableStateFlow(Response.Loading())
-    val likedStations: StateFlow<Response<List<RadioStationModel>>> = _likedStations
-
-    private val _trendingStations: MutableStateFlow<Response<List<RadioStationModel>>> =
-        MutableStateFlow(Response.Loading())
-    val trendingStations: StateFlow<Response<List<RadioStationModel>>> = _trendingStations
 
     private val _topStationsByVotes: MutableStateFlow<Response<StationsBrowseResponse>> =
         MutableStateFlow(Response.Loading())
@@ -79,16 +72,18 @@ class RadioViewModel @Inject constructor(
         repository.provideRadioGenreAggs(country).collect { _genres.value = it }
     }
 
-    fun fetchTrending(country: String) = viewModelScope.launch(Dispatchers.IO) {
-        repository.provideTrendingStations(country).collect { _trendingStations.value = it }
-    }
-
-    fun fetchLikedStations(userId: String) = viewModelScope.launch(Dispatchers.IO) {
-        repository.provideUserLikedStations(userId).collect { _likedStations.value = it }
-    }
-
     fun fetchLastPlayedStations(userId: String) = viewModelScope.launch(Dispatchers.IO) {
-        repository.provideLastPlayedStations(userId).collect { _lastPlayedStations.value = it }
+        repository.provideUserHistory(userId, page = 1, limit = 20).collect { response ->
+            _lastPlayedStations.value = when (response) {
+                is Response.Success -> Response.Success(
+                    response.data.items
+                        .filter { it.isRadioStation && it.s3link.isNotBlank() }
+                        .map { it.toRadioStationModel() }
+                )
+                is Response.Loading -> Response.Loading()
+                is Response.Error -> Response.Error(response.error)
+            }
+        }
     }
 
     fun browseStations(country: String, page: Int = 1) = viewModelScope.launch(Dispatchers.IO) {
@@ -120,7 +115,7 @@ class RadioViewModel @Inject constructor(
                         val incomingRows = incoming.data.results
                         currentGenrePage = incoming.data.page
                         if (append && _genreListing.value is Response.Success) {
-                            val existing = (_genreListing.value as Response.Success).data
+                                val existing = (_genreListing.value as Response.Success<StationsBrowseResponse>).data
                             val merged = (existing.results + incomingRows).distinctBy { it.id }
                             val hasNewItems = merged.size > existing.results.size
                             _hasMoreGenreListing.value = incomingRows.isNotEmpty() && hasNewItems
@@ -149,8 +144,6 @@ class RadioViewModel @Inject constructor(
                     is Response.Loading -> {
                         if (!append) _genreListing.value = incoming
                     }
-
-                    else -> Unit
                 }
             }
         }
@@ -165,9 +158,7 @@ class RadioViewModel @Inject constructor(
         currentUserId = currentUserIdOrEmail()
         if (currentUserId.isNotBlank()) {
             fetchLastPlayedStations(currentUserId)
-            fetchLikedStations(currentUserId)
         }
-        fetchTrending(country)
         fetchGenres(country)
         browseStations(country, 1)
         fetchGenreListing(genre = "", page = 1, append = false)

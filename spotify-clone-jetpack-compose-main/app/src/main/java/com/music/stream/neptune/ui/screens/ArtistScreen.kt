@@ -71,20 +71,18 @@ import com.music.stream.neptune.R
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.ArtistsModel
 import com.music.stream.neptune.data.entity.SongsModel
-import com.music.stream.neptune.data.preferences.addLikedSongId
-import com.music.stream.neptune.data.preferences.isSongLiked
-import com.music.stream.neptune.data.preferences.removeLikedSongId
 import com.music.stream.neptune.di.Palette
-import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
 import com.music.stream.neptune.ui.viewmodel.ArtistViewModel
+import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import kotlinx.coroutines.launch
 
 @Composable
 fun ArtistScreen(navController: NavController, artistId: String) {
     val artistViewModel: ArtistViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = hiltViewModel()
     val artistState by artistViewModel.artist.collectAsState()
     val artistSongsState by artistViewModel.artistSongs.collectAsState()
 
@@ -112,6 +110,7 @@ fun ArtistScreen(navController: NavController, artistId: String) {
                     SumUpArtistScreen(
                         navController = navController,
                         artistViewModel = artistViewModel,
+                        playerViewModel = playerViewModel,
                         artist = artist,
                         songs = songs
                     )
@@ -140,6 +139,7 @@ fun ArtistScreen(navController: NavController, artistId: String) {
 fun SumUpArtistScreen(
     navController: NavController,
     artistViewModel: ArtistViewModel,
+    playerViewModel: PlayerViewModel,
     artist: ArtistsModel,
     songs: List<SongsModel>
 ) {
@@ -268,14 +268,11 @@ fun SumUpArtistScreen(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
                                     ) {
-                                        SongPlayer.playSong(songs[0], context)
-                                        artistViewModel.updateSongState(
-                                            songs[0].thumbnail,
-                                            songs[0].name,
-                                            artist.title,
-                                            true,
-                                            songs[0].id,
-                                            0
+                                        playerViewModel.startSongPlayback(
+                                            queueSongs = songs,
+                                            startIndex = 0,
+                                            album = artist.title,
+                                            context = context
                                         )
                                     }
                             ) {
@@ -300,15 +297,12 @@ fun SumUpArtistScreen(
                                     ) {
                                         val shuffled = songs.shuffled()
                                         if (shuffled.isNotEmpty()) {
-                                            SongPlayer.playSong(shuffled[0], context)
-                                            artistViewModel.updateSongState(
-                                                shuffled[0].thumbnail,
-                                                shuffled[0].name,
-                                                artist.title,
-                                                true,
-                                                shuffled[0].id,
-                                                0
-                                            )
+                                                playerViewModel.startSongPlayback(
+                                                    queueSongs = shuffled,
+                                                    startIndex = 0,
+                                                    album = artist.title,
+                                                    context = context
+                                                )
                                         }
                                     }
                             ) {
@@ -332,7 +326,7 @@ fun SumUpArtistScreen(
                 containerColor = Color(AppBackground.toArgb()),
                 contentColor = Color.White,
                 indicator = { tabPositions ->
-                    TabRowDefaults.Indicator(
+                    TabRowDefaults.SecondaryIndicator(
                         modifier = Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
                         color = Color(AppPalette.toArgb()),
                         height = 2.dp
@@ -369,6 +363,7 @@ fun SumUpArtistScreen(
                         songs = songs,
                         artist = artist,
                         artistViewModel = artistViewModel,
+                        playerViewModel = playerViewModel,
                         context = context
                     )
                     1 -> ArtistAboutTab(artist = artist)
@@ -388,8 +383,10 @@ fun ArtistSongsTab(
     songs: List<SongsModel>,
     artist: ArtistsModel,
     artistViewModel: ArtistViewModel,
+    playerViewModel: PlayerViewModel,
     context: android.content.Context
 ) {
+    val likedSongIds by playerViewModel.likedSongIds.collectAsState()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -404,11 +401,7 @@ fun ArtistSongsTab(
             }
         } else {
             songs.forEachIndexed { index, song ->
-                var isLiked by remember { mutableStateOf(isSongLiked(context, song.id)) }
-                val likeState = artistViewModel.likeState.value
-                LaunchedEffect(likeState) {
-                    isLiked = isSongLiked(context, song.id)
-                }
+                val isLiked = likedSongIds.contains(song.id)
 
                 val isPlaying = song.id == artistViewModel.currentSongId.value
                 val textColor = if (isPlaying) Color(AppPalette.toArgb()) else Color.White
@@ -423,10 +416,11 @@ fun ArtistSongsTab(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
-                            SongPlayer.playSong(song, context)
-                            artistViewModel.updateSongState(
-                                song.thumbnail, song.name, artist.title,
-                                true, song.id, index
+                            playerViewModel.startSongPlayback(
+                                queueSongs = songs,
+                                startIndex = index,
+                                album = artist.title,
+                                context = context
                             )
                         }
                 ) {
@@ -499,10 +493,7 @@ fun ArtistSongsTab(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
                                 ) {
-                                    if (isLiked) removeLikedSongId(context, song.id)
-                                    else addLikedSongId(context, song.id)
-                                    isLiked = isSongLiked(context, song.id)
-                                    artistViewModel.updateLikeState(!artistViewModel.likeState.value)
+                                    playerViewModel.toggleSongLike(song.id)
                                 },
                             painter = if (isLiked) painterResource(R.drawable.added)
                             else painterResource(R.drawable.ic_add),

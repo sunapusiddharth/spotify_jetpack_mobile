@@ -68,16 +68,14 @@ import com.music.stream.neptune.ui.viewmodel.RadioViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RadioScreen(navController: NavController) {
+fun RadioScreen(@Suppress("UNUSED_PARAMETER") navController: NavController) {
     val radioViewModel: RadioViewModel = hiltViewModel()
     val playerViewModel: PlayerViewModel = hiltViewModel()
 
     val countriesState by radioViewModel.countries.collectAsState()
     val genresState by radioViewModel.genres.collectAsState()
     val lastPlayedState by radioViewModel.lastPlayedStations.collectAsState()
-    val likedStationsState by radioViewModel.likedStations.collectAsState()
     val topStationsState by radioViewModel.topStationsByVotes.collectAsState()
-    val trendingState by radioViewModel.trendingStations.collectAsState()
     val genreListingState by radioViewModel.genreListing.collectAsState()
     val hasMoreGenreListing by radioViewModel.hasMoreGenreListing.collectAsState()
     val isFetchingMoreGenreListing by radioViewModel.isFetchingMoreGenreListing.collectAsState()
@@ -163,15 +161,8 @@ fun RadioScreen(navController: NavController) {
             }
 
             RadioCarouselSection(
-                title = "Last Played Stations",
+                title = "History",
                 state = lastPlayedState,
-                onStationClick = { queue, index ->
-                    playerViewModel.startRadioPlayback(queue = queue, startIndex = index, context = context)
-                }
-            )
-            RadioCarouselSection(
-                title = "Liked Stations",
-                state = likedStationsState,
                 onStationClick = { queue, index ->
                     playerViewModel.startRadioPlayback(queue = queue, startIndex = index, context = context)
                 }
@@ -183,14 +174,6 @@ fun RadioScreen(navController: NavController) {
                     playerViewModel.startRadioPlayback(queue = queue, startIndex = index, context = context)
                 }
             )
-            RadioCarouselSection(
-                title = "Trending Stations",
-                state = trendingState,
-                onStationClick = { queue, index ->
-                    playerViewModel.startRadioPlayback(queue = queue, startIndex = index, context = context)
-                }
-            )
-
             Text(
                 text = "Browse By Genres",
                 color = Color.White,
@@ -204,7 +187,7 @@ fun RadioScreen(navController: NavController) {
                 containerColor = Color.Transparent,
                 contentColor = Color.White,
                 indicator = { tabPositions ->
-                    TabRowDefaults.Indicator(
+                    TabRowDefaults.SecondaryIndicator(
                         Modifier.tabIndicatorOffset(tabPositions[selectedGenreTab]),
                         color = Color(AppPalette.toArgb())
                     )
@@ -254,7 +237,7 @@ fun RadioScreen(navController: NavController) {
                             Text("No stations found", color = Color.Gray)
                         }
                     } else {
-                        stations.forEach { station ->
+                        for (station in stations) {
                             val index = stations.indexOfFirst { it.id == station.id }
                             RadioStationRow(
                                 station = station,
@@ -282,7 +265,6 @@ fun RadioScreen(navController: NavController) {
                         }
                     }
                 }
-                else -> Unit
             }
 
             Spacer(Modifier.height(130.dp))
@@ -298,7 +280,6 @@ private fun mapStationsFromBrowse(
         is Response.Success -> Response.Success(state.data.results)
         is Response.Error -> Response.Error(state.error)
         is Response.Loading -> Response.Loading()
-        else -> Response.Loading()
     }
 }
 

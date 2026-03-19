@@ -27,8 +27,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -66,6 +69,7 @@ import com.music.stream.neptune.data.entity.HomePageSectionModel
 import com.music.stream.neptune.data.entity.PodcastModel
 import com.music.stream.neptune.data.entity.RadioStationModel
 import com.music.stream.neptune.data.entity.SongsModel
+import com.music.stream.neptune.data.entity.UserHistoryEntityModel
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.components.StaggeredReveal
@@ -97,9 +101,9 @@ fun HomeScreen(navController: NavController) {
     val hasMoreHomePages by homeViewModel.hasMoreHomePages.collectAsState()
     val artists by homeViewModel.artists.collectAsState()
     val topStations by homeViewModel.topStations.collectAsState()
-    val editorsPlayList by homeViewModel.editorsPlayList.collectAsState()
     val topScoringSongs by homeViewModel.topScoringSongs.collectAsState()
     val topPodcasts by homeViewModel.topPodcasts.collectAsState()
+    val historyEntries by homeViewModel.historyEntries.collectAsState()
 
     val listState = rememberLazyListState()
 
@@ -112,9 +116,9 @@ fun HomeScreen(navController: NavController) {
         val homeSections = (homePage as? Response.Success)?.data?.results.orEmpty()
         val artistsResponse = (artists as? Response.Success)?.data.orEmpty()
         val stationsResponse = (topStations as? Response.Success)?.data.orEmpty()
-        val editorsSection = (editorsPlayList as? Response.Success)?.data
         val topSongsResponse = (topScoringSongs as? Response.Success)?.data.orEmpty()
         val podcastsResponse = (topPodcasts as? Response.Success)?.data.orEmpty()
+        val historyResponse = (historyEntries as? Response.Success)?.data.orEmpty()
         val shouldLoadMore by remember(listState, hasMoreHomePages, isLoadingNextHomePage, homeSections) {
             derivedStateOf {
                 val totalItemsCount = listState.layoutInfo.totalItemsCount
@@ -136,14 +140,13 @@ fun HomeScreen(navController: NavController) {
         val isLoading = homePage is Response.Loading &&
             artists is Response.Loading &&
             topStations is Response.Loading &&
-            editorsPlayList is Response.Loading &&
             topScoringSongs is Response.Loading &&
             topPodcasts is Response.Loading
 
         val hasAnyContent = homeSections.isNotEmpty() ||
+            historyResponse.isNotEmpty() ||
             artistsResponse.isNotEmpty() ||
             stationsResponse.isNotEmpty() ||
-            editorsSection?.cards?.isNotEmpty() == true ||
             topSongsResponse.isNotEmpty() ||
             podcastsResponse.isNotEmpty()
 
@@ -157,10 +160,10 @@ fun HomeScreen(navController: NavController) {
                     navController = navController,
                     playerViewModel = playerViewModel,
                     listState = listState,
+                    historyEntries = historyResponse,
                     homeSections = homeSections,
                     artists = artistsResponse,
                     topStations = stationsResponse,
-                    editorsPlayList = editorsSection,
                     topScoringSongs = topSongsResponse,
                     topPodcasts = podcastsResponse,
                     isLoadingNextHomePage = isLoadingNextHomePage
@@ -170,7 +173,6 @@ fun HomeScreen(navController: NavController) {
                 val error = (homePage as? Response.Error)?.error
                     ?: (artists as? Response.Error)?.error
                     ?: (topStations as? Response.Error)?.error
-                    ?: (editorsPlayList as? Response.Error)?.error
                     ?: (topScoringSongs as? Response.Error)?.error
                     ?: (topPodcasts as? Response.Error)?.error
                 Log.d("homeMain", "Error!! $error")
@@ -190,14 +192,16 @@ fun SumUpHomeScreen(
     navController: NavController,
     playerViewModel: PlayerViewModel,
     listState: androidx.compose.foundation.lazy.LazyListState,
+    historyEntries: List<UserHistoryEntityModel>,
     homeSections: List<HomePageSectionModel>,
     artists: List<ArtistsModel>,
     topStations: List<RadioStationModel>,
-    editorsPlayList: HomePageSectionModel?,
     topScoringSongs: List<SongsModel>,
     topPodcasts: List<PodcastModel>,
     isLoadingNextHomePage: Boolean
 ) {
+    val displaySections = remember(homeSections) { homeSections.filter { it.cards.isNotEmpty() } }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -210,38 +214,43 @@ fun SumUpHomeScreen(
             }
         }
 
-        item {
-            StaggeredReveal(index = 1) {
-                HomePodcastsSection(navController = navController, podcasts = topPodcasts)
-            }
-        }
-
-        if (editorsPlayList?.cards?.isNotEmpty() == true) {
-            item(key = "editors_playlist") {
-                StaggeredReveal(index = 2) {
-                    HomeCardSection(navController = navController, section = editorsPlayList, playerViewModel = playerViewModel)
+        if (historyEntries.isNotEmpty()) {
+            item(key = "history_entries") {
+                StaggeredReveal(index = 1) {
+                    HomeHistorySection(
+                        navController = navController,
+                        playerViewModel = playerViewModel,
+                        entries = historyEntries
+                    )
                 }
             }
         }
 
+        item {
+            StaggeredReveal(index = 2) {
+                HomePodcastsSection(navController = navController, podcasts = topPodcasts)
+            }
+        }
+
         items(
-            items = homeSections.filter { it.cards.isNotEmpty() },
-            key = { section -> "home_section_${section.id.ifBlank { section.label + section.path }}" }
-        ) { section ->
-            val revealIndex = 3 + homeSections.indexOf(section).coerceAtLeast(0)
+            count = displaySections.size,
+            key = { index -> "home_section_${homeSectionUiKey(displaySections[index])}" }
+        ) { index ->
+            val section = displaySections[index]
+            val revealIndex = 3 + index
             StaggeredReveal(index = revealIndex) {
                 HomeCardSection(navController = navController, section = section, playerViewModel = playerViewModel)
             }
         }
 
         item {
-            StaggeredReveal(index = 12) {
-                HomeSongsSection(songs = topScoringSongs, playerViewModel = playerViewModel)
+            StaggeredReveal(index = 13) {
+                HomeSongsSection(title = "Top Tracks For You", songs = topScoringSongs, playerViewModel = playerViewModel)
             }
         }
 
         item {
-            StaggeredReveal(index = 13) {
+            StaggeredReveal(index = 14) {
                 HomeStationsSection(navController = navController, stations = topStations)
             }
         }
@@ -265,6 +274,102 @@ fun SumUpHomeScreen(
     }
 }
 
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+private fun HomeHistorySection(
+    navController: NavController,
+    playerViewModel: PlayerViewModel,
+    entries: List<UserHistoryEntityModel>
+) {
+    if (entries.isEmpty()) return
+
+    val context = LocalContext.current
+
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(15.dp, 16.dp, 16.dp, 0.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "History", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(Modifier.height(HomeSectionHeaderBottomGap))
+
+        LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
+            items(entries.size) { index ->
+                val entry = entries[index]
+                val isPlayable = entry.isSong || entry.isRadioStation || entry.isPodcastEpisode
+                val interactionSource = remember { MutableInteractionSource() }
+                Box(
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .width(HomeStandardCardWidth)
+                        .height(160.dp)
+                        .pressScale(interactionSource, pressedScale = 0.94f)
+                        .clickable(
+                            enabled = isPlayable || entry.isPodcast || entry.isPlaylist || entry.isPlaylistCollection,
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) {
+                            when {
+                                entry.isSong -> playerViewModel.playSongFromHistory(entry, context)
+                                entry.isRadioStation -> playerViewModel.playRadioFromHistory(entry, context)
+                                entry.isPodcastEpisode -> playerViewModel.playPodcastEpisodeFromHistory(entry, context)
+                                entry.isPodcast -> navController.navigate("${Routes.PodcastDetail.route}/${entry.entityId}")
+                                entry.isPlaylist || entry.isPlaylistCollection -> navController.navigate("${Routes.Playlist.route}/${entry.entityId}")
+                            }
+                        }
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        GlideImage(
+                            modifier = Modifier
+                                .size(HomeStandardCardSize)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop,
+                            model = entry.image,
+                            loading = placeholder(R.drawable.placeholder),
+                            failure = placeholder(R.drawable.placeholder),
+                            contentDescription = entry.title
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = entry.title,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            lineHeight = 15.sp,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = entry.subtitle.ifBlank { entry.entityType.replace('_', ' ') },
+                            color = Color.Gray,
+                            fontSize = 11.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun homeSectionUiKey(section: HomePageSectionModel): String {
+    return listOf(
+        section.id,
+        section.path,
+        section.label,
+        section.cardType,
+        section.cards.firstOrNull()?.id.orEmpty()
+    ).joinToString("|")
+}
+
 @Composable
 fun GreetingSection() {
     Spacer(modifier = Modifier.height(6.dp))
@@ -277,6 +382,9 @@ private fun HomeCardSection(navController: NavController, section: HomePageSecti
     val playableSongs = remember(section.cards) {
         section.cards.mapNotNull { it.song }.filter { it.hasPlayableAudio }
     }
+    val titleClickable = section.path.isNotBlank() || section.id.isNotBlank()
+    val showsPlaylistCollectionIndicator = remember(section) { sectionNavigatesToPlaylistCollection(section) }
+    val titleInteractionSource = remember { MutableInteractionSource() }
 
     Column {
         Row(
@@ -286,19 +394,32 @@ private fun HomeCardSection(navController: NavController, section: HomePageSecti
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = section.label.ifBlank { "Recommended" },
-                color = Color.White,
-                fontSize = HomeSectionTitleSize,
-                fontWeight = FontWeight.Bold,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.clickable(
-                    enabled = section.path.isNotBlank() || section.id.isNotBlank(),
-                    interactionSource = remember { MutableInteractionSource() },
+                    enabled = titleClickable,
+                    interactionSource = titleInteractionSource,
                     indication = null
                 ) {
                     navigateToHomeSection(navController, section)
                 }
-            )
+            ) {
+                Text(
+                    text = section.label.ifBlank { "Recommended" },
+                    color = Color.White,
+                    fontSize = HomeSectionTitleSize,
+                    fontWeight = FontWeight.Bold
+                )
+                if (showsPlaylistCollectionIndicator) {
+                    Spacer(Modifier.width(6.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = "Opens playlist collection",
+                        tint = Color.White.copy(alpha = 0.72f),
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(HomeSectionHeaderBottomGap))
@@ -389,6 +510,12 @@ private fun HomeCardSection(navController: NavController, section: HomePageSecti
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 private fun HomeSongsSection(songs: List<SongsModel>, playerViewModel: PlayerViewModel) {
+    HomeSongsSection(title = "Top Tracks For You", songs = songs, playerViewModel = playerViewModel)
+}
+
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+private fun HomeSongsSection(title: String, songs: List<SongsModel>, playerViewModel: PlayerViewModel) {
     if (songs.isEmpty()) return
 
     val context = LocalContext.current
@@ -402,7 +529,7 @@ private fun HomeSongsSection(songs: List<SongsModel>, playerViewModel: PlayerVie
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "Top Tracks For You", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
+            Text(text = title, color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
         }
 
         Spacer(Modifier.height(HomeSectionHeaderBottomGap))
@@ -427,7 +554,7 @@ private fun HomeSongsSection(songs: List<SongsModel>, playerViewModel: PlayerVie
                             playerViewModel.startSongPlayback(
                                 queueSongs = playableSongs,
                                 startIndex = startIndex,
-                                album = "Top Tracks For You",
+                                album = title,
                                 context = context
                             )
                         }
@@ -659,6 +786,10 @@ private fun navigateToHomeSection(navController: NavController, section: HomePag
             navController.navigate("${Routes.Podcast.route}")
         }
     }
+}
+
+private fun sectionNavigatesToPlaylistCollection(section: HomePageSectionModel): Boolean {
+    return section.path.startsWith("/playlist_collection")
 }
 
 private fun extractTrailingId(path: String, fallbackId: String): String {

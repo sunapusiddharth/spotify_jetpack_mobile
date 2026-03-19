@@ -5,9 +5,10 @@ import com.music.stream.neptune.data.entity.PodcastModel
 import com.music.stream.neptune.data.entity.RadioStationModel
 import com.music.stream.neptune.data.entity.SongsModel
 import com.music.stream.neptune.data.entity.web.WebArtistType
-import com.music.stream.neptune.data.entity.web.WebMeiliSearchAggType
 import com.music.stream.neptune.data.entity.web.WebHomePageDataType
+import com.music.stream.neptune.data.entity.web.WebMeiliSearchAggType
 import com.music.stream.neptune.data.entity.web.WebPlayListType
+import com.music.stream.neptune.data.entity.web.WebAllPlayListType
 import com.music.stream.neptune.data.entity.web.WebPodcastCardDto
 import com.music.stream.neptune.data.entity.web.WebPodcastsByGenrePageInfo
 import com.music.stream.neptune.data.entity.web.WebPodcastEpisodesPageInfo
@@ -20,8 +21,8 @@ import com.music.stream.neptune.data.entity.web.WebSongType
 import com.music.stream.neptune.data.entity.web.WebUserType
 import com.music.stream.neptune.data.entity.web.WebUserPlayListType
 import com.google.gson.JsonObject
-import retrofit2.Response as RetrofitResponse
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.POST
@@ -42,6 +43,9 @@ interface NetworkApi {
     // Album endpoints
     @GET("album/freshAlbums")
     suspend fun getFreshAlbums(): List<WebPlayListType>
+
+    @GET("album/all/{page}")
+    suspend fun getAllAlbums(@Path("page") page: Int): WebAllPlayListPageResponse
 
     @GET("album/{id}")
     suspend fun getAlbumById(@Path("id") id: String): WebPlayListType
@@ -69,50 +73,45 @@ interface NetworkApi {
         @Path("limit") limit: Int
     ): List<WebSongType>
 
-    @POST("tracks/{id}/add-multiple")
-    suspend fun addPlaylistToQueue(
-        @Path("id") userId: String,
-        @Body body: AddMultipleTracksRequest
-    ): RetrofitResponse<Unit>
-
-    @GET("tracks/{userid}/next_item_in_queue")
-    suspend fun getNextQueueItem(@Path("userid") userId: String): QueueItemResponse
-
-    @GET("tracks/{userid}/prev_item_in_queue")
-    suspend fun getPrevQueueItem(@Path("userid") userId: String): QueueItemResponse
-
     @POST("tracks/requestTrackAddition/{userid}/{songid}")
     suspend fun requestTrackAddition(
         @Path("userid") userId: String,
         @Path("songid") songId: String
     ): RequestTrackAdditionResponse
 
-    @PUT("users/{id}/likedislike/song/{trackid}/{likedislike}")
-    suspend fun likeDislikeSong(
-        @Path("id") userId: String,
-        @Path("trackid") trackId: String,
-        @Path("likedislike") likeDislike: Boolean
+    @POST("users/{userId}/likes/{entityId}")
+    suspend fun likeEntity(
+        @Path("userId") userId: String,
+        @Path("entityId") entityId: String,
+        @Body body: LikeEntityRequest
     ): ApiStatusResponse
 
-    @PUT("users/{id}/likedislike/radio/{trackid}/{likedislike}")
-    suspend fun likeDislikeRadio(
-        @Path("id") userId: String,
-        @Path("trackid") trackId: String,
-        @Path("likedislike") likeDislike: Boolean
+    @DELETE("users/{userId}/likes/{entityId}")
+    suspend fun unlikeEntity(
+        @Path("userId") userId: String,
+        @Path("entityId") entityId: String
     ): ApiStatusResponse
 
-    @PUT("users/{id}/likedislike/podcast/{trackid}/{likedislike}")
-    suspend fun likeDislikePodcast(
-        @Path("id") userId: String,
-        @Path("trackid") trackId: String,
-        @Path("likedislike") likeDislike: Boolean
+    @GET("users/{userId}/likes")
+    suspend fun getUserLikes(
+        @Path("userId") userId: String,
+        @Query("page") page: Int,
+        @Query("limit") limit: Int
+    ): PaginatedApiResponse<LikedEntityResponseDto>
+
+    @PUT("users/{userId}/history/{entityId}")
+    suspend fun updateHistory(
+        @Path("userId") userId: String,
+        @Path("entityId") entityId: String,
+        @Body body: UpdateHistoryRequest
     ): ApiStatusResponse
 
-    @GET("tracks/allSongs/{page}/{limit}")
-    suspend fun getAllSongs(
-        @Path("page") page: Int,
-        @Path("limit") limit: Int
-    ): WebSongsPageResponse
+    @GET("users/{userId}/history")
+    suspend fun getUserHistory(
+        @Path("userId") userId: String,
+        @Query("page") page: Int,
+        @Query("limit") limit: Int
+    ): PaginatedApiResponse<HistoryEntityResponseDto>
 
     @GET("stream/all_available_songs/{skip}/{limit}")
     suspend fun getAllAvailableSongs(
@@ -147,27 +146,6 @@ interface NetworkApi {
         @Path("page") page: Int
     ): WebPodcastEpisodesPageInfo
 
-    @GET("podcast/{userid}/liked_podcasts")
-    suspend fun getUserLikedPodcasts(@Path("userid") userId: String): List<WebPodcastCardDto>
-
-    @PUT("podcast/{userid}/liked_podcast/{podcastid}/{episodeid}")
-    suspend fun userLikedPodcasts(
-        @Path("userid") userId: String,
-        @Path("podcastid") podcastId: String,
-        @Path("episodeid") episodeId: String
-    ): ApiStatusResponse
-
-    @PUT("podcast/{userid}/listened_station/{podcastid}/{episodeid}/{duration}")
-    suspend fun userListenedPodcasts(
-        @Path("userid") userId: String,
-        @Path("podcastid") podcastId: String,
-        @Path("episodeid") episodeId: String,
-        @Path("duration") duration: Int
-    ): List<WebPodcastCardDto>
-
-    @GET("podcast/{id}/topPodcastsByUserActivity")
-    suspend fun topPodcastsByUserActivity(@Path("id") userId: String): List<WebPodcastCardDto>
-
     @POST("podcast/requestPodcastEpisodesPopulation/{userid}/{songid}")
     suspend fun requestPodcastEpisodesPopulation(
         @Path("userid") userId: String,
@@ -183,22 +161,6 @@ interface NetworkApi {
 
     @GET("radio/all_genres/{country}")
     suspend fun getRadioGenres(@Path("country") country: String): List<WebMeiliSearchAggType>
-
-    @GET("radio/{country}/trendingStations")
-    suspend fun getTrendingStations(@Path("country") country: String): List<WebRadioStation>
-
-    @GET("radio/{userid}/liked_stations")
-    suspend fun getUserLikedStations(@Path("userid") userId: String): List<WebRadioStation>
-
-    @GET("radio/{userid}/last_played_stations")
-    suspend fun getLastPlayedStations(@Path("userid") userId: String): List<WebRadioStation>
-
-    @PUT("radio/{userid}/listened_station/{stationid}/{duration}")
-    suspend fun userListenedStation(
-        @Path("userid") userId: String,
-        @Path("stationid") stationId: String,
-        @Path("duration") duration: Int
-    ): ApiStatusResponse
 
     @GET("radio/{country}/browseStationsByCountry/{page}")
     suspend fun browseStations(
@@ -220,12 +182,6 @@ interface NetworkApi {
     @GET("playlist_collection/{id}")
     suspend fun getPlaylistCollectionById(@Path("id") id: String): WebPlayListType
 
-    @GET("playlist_collection/getEditorsPlayList/{limit}")
-    suspend fun getEditorsPlayList(@Path("limit") limit: Int): WebHomePageDataType
-
-    @GET("playlist_collection/latest")
-    suspend fun getLatestPlaylistCollections(): WebPlaylistCollectionBrowseResponse
-
     @GET("playlist/{userid}/playlists")
     suspend fun getUserPlaylists(@Path("userid") userId: String): List<WebUserPlayListType>
 
@@ -244,8 +200,29 @@ interface NetworkApi {
     ): WebPlayListType
 }
 
-data class AddMultipleTracksRequest(
-    val songs: List<String> = emptyList()
+data class LikeEntityRequest(
+    val entityId: String,
+    val entityType: String,
+    val title: String,
+    val image: String? = null,
+    val s3link: String? = null,
+    val albumName: String? = null,
+    val podcastName: String? = null,
+    val episodeNumber: Int? = null
+)
+
+data class UpdateHistoryRequest(
+    val entityId: String,
+    val entityType: String,
+    val title: String,
+    val image: String? = null,
+    val s3link: String? = null,
+    val albumName: String? = null,
+    val podcastName: String? = null,
+    val episodeNumber: Int? = null,
+    val watchedDuration: Int = 0,
+    val totalDuration: Int = 0,
+    val watchedPercentage: Int = 0
 )
 
 data class WebHomePageInfo(
@@ -253,22 +230,44 @@ data class WebHomePageInfo(
     val page: Int = 0
 )
 
-data class QueueItemResponse(
-    val song: QueueSongResponse = QueueSongResponse(),
-    val updated_queue: List<QueueSongResponse> = emptyList()
+data class WebAllPlayListPageResponse(
+    val results: List<WebAllPlayListType> = emptyList(),
+    val page: Int = 0
 )
 
-data class QueueSongResponse(
-    val id: String = "",
-    val name: String = "",
-    val album: String = "",
-    val artists: List<String> = emptyList(),
-    val duration_ms: Int = 0,
-    val preview_url: String? = null,
-    val genres: List<String> = emptyList(),
-    val album_id: String = "",
+data class PaginatedApiResponse<T>(
+    val items: List<T> = emptyList(),
+    val total: Int = 0,
+    val page: Int = 1,
+    val limit: Int = 20,
+    val hasMore: Boolean = false
+)
+
+data class LikedEntityResponseDto(
+    val entityId: String = "",
+    val entityType: String = "",
+    val image: String? = null,
+    val title: String = "",
     val s3link: String? = null,
-    val thumbnail: String = ""
+    val albumName: String? = null,
+    val podcastName: String? = null,
+    val episodeNumber: Int? = null,
+    val likedAt: String = ""
+)
+
+data class HistoryEntityResponseDto(
+    val entityId: String = "",
+    val entityType: String = "",
+    val title: String = "",
+    val image: String? = null,
+    val s3link: String? = null,
+    val watchedDuration: Int = 0,
+    val totalDuration: Int = 0,
+    val watchedPercentage: Int = 0,
+    val lastPlayedAt: String = "",
+    val albumName: String? = null,
+    val podcastName: String? = null,
+    val episodeNumber: Int? = null
 )
 
 data class RequestTrackAdditionResponse(
@@ -294,12 +293,6 @@ data class WebArtistSongsPaginationResponse(
 
 data class WebSongsPageResponse(
     val results: List<WebSongType> = emptyList(),
-    val page: Int = 0,
-    val total: Int = 0
-)
-
-data class WebPlaylistCollectionBrowseResponse(
-    val results: List<WebPlayListType> = emptyList(),
     val page: Int = 0,
     val total: Int = 0
 )
@@ -334,6 +327,12 @@ data class PodcastEpisodesResponse(
 
 data class StationsBrowseResponse(
     val results: List<RadioStationModel> = emptyList(),
+    val page: Int = 0,
+    val total: Int = 0
+)
+
+data class AlbumsBrowseResponse(
+    val results: List<com.music.stream.neptune.data.entity.AlbumsModel> = emptyList(),
     val page: Int = 0,
     val total: Int = 0
 )

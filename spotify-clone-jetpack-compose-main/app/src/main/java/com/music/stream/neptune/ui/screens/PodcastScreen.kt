@@ -50,8 +50,10 @@ import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.PodcastModel
+import com.music.stream.neptune.data.entity.UserHistoryEntityModel
 import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.navigation.Routes
+import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.viewmodel.PodcastViewModel
 
@@ -59,10 +61,11 @@ import com.music.stream.neptune.ui.viewmodel.PodcastViewModel
 @Composable
 fun PodcastScreen(navController: NavController) {
     val podcastViewModel: PodcastViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = hiltViewModel()
     val podcastsState by podcastViewModel.podcasts.collectAsState()
     val genresState by podcastViewModel.genres.collectAsState()
-    val likedState by podcastViewModel.likedPodcasts.collectAsState()
-    val activityState by podcastViewModel.topPodcastsByActivity.collectAsState()
+    val historyState by podcastViewModel.historyEntries.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     val bgColor = Color(AppBackground.toArgb())
 
@@ -126,20 +129,14 @@ fun PodcastScreen(navController: NavController) {
             }
 
             Spacer(Modifier.height(20.dp))
-
-            PodcastHorizontalSection(
-                title = "You Liked These Podcasts",
-                state = likedState,
-                navController = navController
-            )
-
-            PodcastHorizontalSection(
-                title = "You May Like",
-                state = activityState,
-                navController = navController
-            )
-
             Spacer(Modifier.height(12.dp))
+
+            PodcastHistorySection(
+                entries = (historyState as? Response.Success)?.data.orEmpty(),
+                navController = navController,
+                playerViewModel = playerViewModel,
+                context = context
+            )
 
             when (podcastsState) {
                 is Response.Loading -> Loader()
@@ -170,7 +167,7 @@ fun PodcastScreen(navController: NavController) {
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                         Spacer(Modifier.height(10.dp))
-                        filtered.forEach { podcast ->
+                        for (podcast in filtered) {
                             PodcastRowItem(podcast, navController)
                         }
                     } else {
@@ -190,10 +187,87 @@ fun PodcastScreen(navController: NavController) {
                         contentAlignment = Alignment.Center
                     ) { Text("Failed to load podcasts", color = Color.Gray) }
                 }
-                else -> {}
             }
 
             Spacer(Modifier.height(130.dp))
+        }
+    }
+}
+
+@Composable
+private fun PodcastHistorySection(
+    entries: List<UserHistoryEntityModel>,
+    navController: NavController,
+    playerViewModel: PlayerViewModel,
+    context: android.content.Context
+) {
+    if (entries.isEmpty()) return
+
+    Text(
+        "History",
+        color = Color.White,
+        fontSize = 18.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(horizontal = 16.dp)
+    )
+    Spacer(Modifier.height(10.dp))
+
+    entries.forEach { entry ->
+        PodcastHistoryRow(
+            entry = entry,
+            onClick = {
+                when {
+                    entry.isPodcastEpisode -> playerViewModel.playPodcastEpisodeFromHistory(entry, context)
+                    entry.isPodcast -> navController.navigate("${Routes.PodcastDetail.route}/${entry.entityId}")
+                }
+            }
+        )
+    }
+
+    Spacer(Modifier.height(20.dp))
+}
+
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+private fun PodcastHistoryRow(entry: UserHistoryEntityModel, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFF161620))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onClick() }
+            .padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        GlideImage(
+            model = entry.image,
+            contentDescription = entry.title,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(62.dp)
+                .clip(RoundedCornerShape(8.dp))
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = entry.title,
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = entry.subtitle.ifBlank { if (entry.isPodcastEpisode) "Episode" else "Podcast" },
+                color = Color.Gray,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

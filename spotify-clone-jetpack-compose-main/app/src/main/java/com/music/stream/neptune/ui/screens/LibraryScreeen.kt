@@ -51,12 +51,11 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.AlbumsModel
 import com.music.stream.neptune.data.preferences.getAlbumsByIds
-import com.music.stream.neptune.data.preferences.getLikedAlbumIds
-import com.music.stream.neptune.data.preferences.getLikedSongIds
 import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.viewmodel.HomeViewModel
+import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,7 +81,10 @@ fun LibraryScreen(navController: NavController) {
         }
     ) { padding ->
         val libraryViewModel: HomeViewModel = hiltViewModel()
+        val playerViewModel: PlayerViewModel = hiltViewModel()
         val albums by libraryViewModel.albums.collectAsState()
+        val likedSongIds by playerViewModel.likedSongIds.collectAsState()
+        val likedAlbumIds by playerViewModel.likedAlbumIds.collectAsState()
 
         when (albums) {
             is Response.Loading -> {
@@ -91,7 +93,7 @@ fun LibraryScreen(navController: NavController) {
             }
             is Response.Success -> {
                 val albumsResponse = (albums as Response.Success).data
-                SumUpLibraryScreen(padding, albumsResponse, navController)
+                SumUpLibraryScreen(padding, albumsResponse, navController, likedSongIds, likedAlbumIds)
             }
             is Response.Error -> {
                 Log.d("LibraryScreen", "Error loading albums")
@@ -112,11 +114,10 @@ fun LibraryScreen(navController: NavController) {
 fun SumUpLibraryScreen(
     padding: PaddingValues,
     albums: List<AlbumsModel>,
-    navController: NavController
+    navController: NavController,
+    likedSongIds: Set<String>,
+    likedAlbumIds: Set<String>
 ) {
-    val context = LocalContext.current
-    val likedAlbumIds = getLikedAlbumIds(context)
-    val likedSongIds = getLikedSongIds(context)
     val libraryAlbums = getAlbumsByIds(likedAlbumIds, albums)
 
     Column(

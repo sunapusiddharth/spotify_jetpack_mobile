@@ -12,11 +12,21 @@ import javax.inject.Singleton
 
 @Singleton
 class CurrentSongState @Inject constructor() {
+    companion object {
+        const val MAX_QUEUE_WINDOW_SIZE = 30
+    }
+
     private val _title: MutableState<String> = mutableStateOf("")
     val title: State<String> get() = _title
 
     private val _album: MutableState<String> = mutableStateOf("")
     val album: State<String> get() = _album
+
+    private val _albumTitle: MutableState<String> = mutableStateOf("")
+    val albumTitle: State<String> get() = _albumTitle
+
+    private val _albumId: MutableState<String> = mutableStateOf("")
+    val albumId: State<String> get() = _albumId
 
     private val _singer: MutableState<String> = mutableStateOf("")
     val singer: State<String> get() = _singer
@@ -55,6 +65,10 @@ class CurrentSongState @Inject constructor() {
     private val _activePodcast: MutableState<PodcastModel?> = mutableStateOf(null)
     val activePodcast: State<PodcastModel?> get() = _activePodcast
 
+    private var songSourceQueue: List<SongsModel> = emptyList()
+    private var radioSourceQueue: List<RadioStationModel> = emptyList()
+    private var podcastSourceQueue: List<PodcastEpisodeModel> = emptyList()
+
     val shuffle = mutableStateOf(false)
     val repeat = mutableStateOf(false)
     val likeState = mutableStateOf(false)
@@ -78,11 +92,15 @@ class CurrentSongState @Inject constructor() {
         playingState: Boolean,
         songId: String,
         songIndex: Int,
-        album: String
+        album: String,
+        albumTitle: String = _albumTitle.value,
+        albumId: String = _albumId.value
     ) {
         _coverUri.value = coverUri
         _title.value = title
         _album.value = album
+        _albumTitle.value = albumTitle
+        _albumId.value = albumId
         _singer.value = singer
         _playingState.value = playingState
         _songIndex.value = songIndex
@@ -94,29 +112,87 @@ class CurrentSongState @Inject constructor() {
     }
 
     fun setSongQueue(queue: List<SongsModel>, currentIndex: Int) {
-        _songQueue.value = queue
-        _songIndex.value = currentIndex.coerceAtLeast(0)
+        val playableQueue = queue.filter { it.hasPlayableAudio }
+        songSourceQueue = playableQueue
+        if (playableQueue.isEmpty()) {
+            _songQueue.value = emptyList()
+            _songIndex.value = 0
+            _mediaType.value = PlaybackMediaType.SONG
+            return
+        }
+
+        val safeIndex = currentIndex.coerceIn(0, playableQueue.lastIndex)
+        _songIndex.value = safeIndex
+        _songQueue.value = buildQueueWindow(playableQueue, safeIndex)
         _mediaType.value = PlaybackMediaType.SONG
     }
 
     fun setRadioQueue(queue: List<RadioStationModel>, currentIndex: Int) {
-        _radioQueue.value = queue
-        _radioIndex.value = currentIndex.coerceAtLeast(0)
+        radioSourceQueue = queue
+        if (queue.isEmpty()) {
+            _radioQueue.value = emptyList()
+            _radioIndex.value = 0
+            _mediaType.value = PlaybackMediaType.RADIO
+            return
+        }
+
+        val safeIndex = currentIndex.coerceIn(0, queue.lastIndex)
+        _radioIndex.value = safeIndex
+        _radioQueue.value = buildQueueWindow(queue, safeIndex)
         _mediaType.value = PlaybackMediaType.RADIO
     }
 
     fun setPodcastQueue(podcast: PodcastModel, queue: List<PodcastEpisodeModel>, currentIndex: Int) {
         _activePodcast.value = podcast
-        _podcastQueue.value = queue
-        _podcastIndex.value = currentIndex.coerceAtLeast(0)
+        val playableQueue = queue.filter { it.hasAudio }
+        podcastSourceQueue = playableQueue
+        if (playableQueue.isEmpty()) {
+            _podcastQueue.value = emptyList()
+            _podcastIndex.value = 0
+            _mediaType.value = PlaybackMediaType.PODCAST
+            return
+        }
+
+        val safeIndex = currentIndex.coerceIn(0, playableQueue.lastIndex)
+        _podcastIndex.value = safeIndex
+        _podcastQueue.value = buildQueueWindow(playableQueue, safeIndex)
         _mediaType.value = PlaybackMediaType.PODCAST
     }
 
     fun setRadioIndex(index: Int) {
-        _radioIndex.value = index.coerceAtLeast(0)
+        if (radioSourceQueue.isEmpty()) return
+        val safeIndex = index.coerceIn(0, radioSourceQueue.lastIndex)
+        _radioIndex.value = safeIndex
+        _radioQueue.value = buildQueueWindow(radioSourceQueue, safeIndex)
     }
 
     fun setPodcastIndex(index: Int) {
-        _podcastIndex.value = index.coerceAtLeast(0)
+        if (podcastSourceQueue.isEmpty()) return
+        val safeIndex = index.coerceIn(0, podcastSourceQueue.lastIndex)
+        _podcastIndex.value = safeIndex
+        _podcastQueue.value = buildQueueWindow(podcastSourceQueue, safeIndex)
+    }
+
+    fun setSongIndex(index: Int) {
+        if (songSourceQueue.isEmpty()) return
+        val safeIndex = index.coerceIn(0, songSourceQueue.lastIndex)
+        _songIndex.value = safeIndex
+        _songQueue.value = buildQueueWindow(songSourceQueue, safeIndex)
+    }
+
+    fun getSongSourceQueue(): List<SongsModel> = songSourceQueue
+
+    fun getRadioSourceQueue(): List<RadioStationModel> = radioSourceQueue
+
+    fun getPodcastSourceQueue(): List<PodcastEpisodeModel> = podcastSourceQueue
+
+    private fun <T> buildQueueWindow(queue: List<T>, currentIndex: Int): List<T> {
+        if (queue.isEmpty()) return emptyList()
+
+        val safeIndex = currentIndex.coerceIn(0, queue.lastIndex)
+        val windowSize = minOf(queue.size, MAX_QUEUE_WINDOW_SIZE)
+        return List(windowSize) { offset ->
+            queue[(safeIndex + offset) % queue.size]
+        }
     }
 }

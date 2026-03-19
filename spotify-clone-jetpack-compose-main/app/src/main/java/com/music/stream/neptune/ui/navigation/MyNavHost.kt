@@ -8,6 +8,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.music.stream.neptune.ui.screens.AlbumScreen
+import com.music.stream.neptune.ui.screens.AlbumsScreen
 import com.music.stream.neptune.ui.screens.ArtistScreen
 import com.music.stream.neptune.ui.screens.AvailableTracksScreen
 import com.music.stream.neptune.ui.screens.HomeScreen
@@ -55,6 +56,14 @@ fun MyNavHost(
                 bottomBarPlayerState.value = playerState.isNotEmpty()
             }
             LibraryScreen(navHostController)
+        }
+
+        composable(Routes.Albums.route) {
+            LaunchedEffect(playerState) {
+                bottomBarState.value = true
+                bottomBarPlayerState.value = playerState.isNotEmpty()
+            }
+            AlbumsScreen(navHostController)
         }
 
         composable(Routes.Player.route) {

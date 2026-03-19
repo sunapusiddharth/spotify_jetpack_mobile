@@ -74,13 +74,13 @@ import com.bumptech.glide.integration.compose.placeholder
 import com.music.stream.neptune.R
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.SongsModel
-import com.music.stream.neptune.data.preferences.getSongsByIds
 import com.music.stream.neptune.di.PlaybackMediaType
 import com.music.stream.neptune.di.Palette
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.CustomSlider
 import com.music.stream.neptune.ui.components.Snackbar
 import com.music.stream.neptune.ui.components.pressScale
+import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
@@ -97,6 +97,8 @@ fun PlayerScreen(navController: NavController) {
     val songPlayingState = playerViewModel.currentSongPlayingState.value
     val songId = playerViewModel.currentSongId.value
     val mediaType = playerViewModel.mediaType.value
+    val songAlbumTitle = playerViewModel.currentSongAlbumTitle.value
+    val songAlbumId = playerViewModel.currentSongAlbumId.value
     val context = LocalContext.current
     val likedSongIds by playerViewModel.likedSongIds.collectAsState()
     val actionMessage by playerViewModel.actionMessage.collectAsState()
@@ -120,46 +122,14 @@ fun PlayerScreen(navController: NavController) {
         dominantColor = color
     }
 
-    val songsResponse by playerViewModel.songs.collectAsState()
     val shuffle = playerViewModel.shuffleState.value
     val repeat = playerViewModel.repeatState.value
-
-    val songs = if (songsResponse is Response.Success) {
-        (songsResponse as Response.Success).data
-    } else emptyList()
-
-    var queueSongs by remember { mutableStateOf(listOf<SongsModel>()) }
-    val playingArtist by remember { mutableStateOf(playerViewModel.playingArtist) }
-
-    when {
-        playerViewModel.currentSongAlbum.value == "Liked Songs" -> {
-            queueSongs = getSongsByIds(likedSongIds, songs).sortedBy { it.title }
-        }
-        playerViewModel.currentSongAlbum.value.isNotEmpty() -> {
-            queueSongs = songs.filter {
-                it.album.title.lowercase().contains(
-                    playerViewModel.currentSongAlbum.value.lowercase()
-                )
-            }
-        }
-        else -> {
-            queueSongs = songs.filter {
-                it.singer.lowercase().contains(playingArtist.lowercase())
-            }.sortedBy { it.title }
-        }
-    }
 
     if ((songProgressText != "0:00") && (songDurationText == songProgressText)) {
         if (repeat) {
             SongPlayer.seekTo(0)
         } else {
             playerViewModel.playNext(context)
-        }
-    }
-
-    LaunchedEffect(mediaType, queueSongs, songId) {
-        if (mediaType == PlaybackMediaType.SONG) {
-            playerViewModel.syncSongQueue(queueSongs, songId)
         }
     }
 
@@ -212,8 +182,9 @@ fun PlayerScreen(navController: NavController) {
 
             GlideImage(
                 modifier = Modifier
-                    .size(360.dp)
-                    .padding(20.dp)
+                    .fillMaxWidth()
+                    .height(410.dp)
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
                     .graphicsLayer(translationX = artworkDragOffset)
                     .pointerInput(songId, mediaType) {
                         var totalDrag = 0f
@@ -285,6 +256,13 @@ fun PlayerScreen(navController: NavController) {
                 PlayerInfo(
                     songTitle = songTitle,
                     songSinger = songSinger,
+                    albumTitle = songAlbumTitle,
+                    showAlbumLink = mediaType == PlaybackMediaType.SONG && songAlbumId.isNotBlank(),
+                    onAlbumClick = {
+                        if (songAlbumId.isNotBlank()) {
+                            navController.navigate("${Routes.Album.route}/$songAlbumId")
+                        }
+                    },
                     isLiked = likedSongIds.contains(songId),
                     showLike = mediaType == PlaybackMediaType.SONG,
                     onLike = { playerViewModel.toggleLikeCurrentMedia() }
@@ -430,7 +408,7 @@ fun PlayerScreen(navController: NavController) {
         }
 
         // ── Queue Sheet Overlay ──────────────────────────────────────────────
-        val activeSongQueue = if (playerViewModel.songQueue.value.isNotEmpty()) playerViewModel.songQueue.value else queueSongs
+        val activeSongQueue = playerViewModel.songQueue.value
         AnimatedVisibility(
             visible = showQueue && mediaType == PlaybackMediaType.SONG,
             enter = slideInVertically(initialOffsetY = { it }),
@@ -622,7 +600,7 @@ fun QueueSheet(
                 }
             } else {
                 LazyColumn(state = listState) {
-                    itemsIndexed(queueSongs) { index, song ->
+                    itemsIndexed(queueSongs) { _, song ->
                         val isCurrentSong = song.id == currentSongId
                         val interactionSource = remember { MutableInteractionSource() }
                         val bgColor by animateColorAsState(
@@ -648,11 +626,7 @@ fun QueueSheet(
                                     interactionSource = interactionSource,
                                     indication = null
                                 ) {
-                                    SongPlayer.playSong(song, context)
-                                    playerViewModel.updateSongState(
-                                        song.thumbnail, song.name, song.singer,
-                                        true, song.id, index, playerViewModel.currentSongAlbum.value
-                                    )
+                                    playerViewModel.playSongById(song.id, context)
                                 }
                                 .padding(horizontal = 20.dp, vertical = 10.dp)
                         ) {
@@ -760,6 +734,9 @@ fun PlayerTopBar(navController: NavController) {
 fun PlayerInfo(
     songTitle: String,
     songSinger: String,
+    albumTitle: String,
+    showAlbumLink: Boolean,
+    onAlbumClick: () -> Unit,
     isLiked: Boolean,
     showLike: Boolean,
     onLike: () -> Unit
@@ -791,6 +768,21 @@ fun PlayerInfo(
                 fontWeight = FontWeight.Normal,
                 maxLines = 1
             )
+            if (showAlbumLink) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = albumTitle,
+                    color = Color.White.copy(alpha = 0.78f),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onAlbumClick() }
+                )
+            }
         }
         if (showLike) {
             Spacer(Modifier.width(12.dp))
@@ -827,7 +819,7 @@ fun PlayerFull(
         // Shuffle
         Icon(
             modifier = Modifier
-                .size(26.dp)
+                .size(22.dp)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -840,7 +832,7 @@ fun PlayerFull(
         // Previous
         Icon(
             modifier = Modifier
-                .size(36.dp)
+                .size(30.dp)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -855,7 +847,7 @@ fun PlayerFull(
         // Play / Pause
         Box(
             modifier = Modifier
-                .size(68.dp)
+                .size(60.dp)
                 .clip(CircleShape)
                 .background(Color.White)
                 .clickable {
@@ -886,7 +878,7 @@ fun PlayerFull(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier.size(26.dp),
                 tint = Color.Black,
                 painter = if (songPlayingState) painterResource(id = R.drawable.ic_playing)
                 else painterResource(id = R.drawable.play_svgrepo_com),
@@ -897,7 +889,7 @@ fun PlayerFull(
         // Next
         Icon(
             modifier = Modifier
-                .size(36.dp)
+                .size(30.dp)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null
@@ -912,7 +904,7 @@ fun PlayerFull(
         // Repeat
         Icon(
             modifier = Modifier
-                .size(26.dp)
+                .size(22.dp)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null

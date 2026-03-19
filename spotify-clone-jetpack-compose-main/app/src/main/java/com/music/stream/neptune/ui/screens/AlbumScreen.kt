@@ -58,22 +58,18 @@ import com.music.stream.neptune.R
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.AlbumsModel
 import com.music.stream.neptune.data.entity.SongsModel
-import com.music.stream.neptune.data.preferences.addLikedAlbumId
-import com.music.stream.neptune.data.preferences.addLikedSongId
-import com.music.stream.neptune.data.preferences.isAlbumLiked
-import com.music.stream.neptune.data.preferences.isSongLiked
-import com.music.stream.neptune.data.preferences.removeLikedAlbumId
-import com.music.stream.neptune.data.preferences.removeLikedSongId
 import com.music.stream.neptune.di.Palette
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
 import com.music.stream.neptune.ui.viewmodel.AlbumViewModel
+import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 
 @Composable
 fun AlbumScreen(navController: NavController, albumId: String) {
     val albumViewModel: AlbumViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = hiltViewModel()
     val albumState by albumViewModel.album.collectAsState()
     val songsState by albumViewModel.songs.collectAsState()
 
@@ -86,7 +82,8 @@ fun AlbumScreen(navController: NavController, albumId: String) {
                 com.music.stream.neptune.ui.components.LikedSongsScreen(
                     songs = allSongs,
                     navController = navController,
-                    context = LocalContext.current
+                    context = LocalContext.current,
+                    playerViewModel = playerViewModel
                 )
             }
             is Response.Error -> {}
@@ -112,6 +109,7 @@ fun AlbumScreen(navController: NavController, albumId: String) {
                     SumUpAlbumScreen(
                         navController = navController,
                         albumViewModel = albumViewModel,
+                        playerViewModel = playerViewModel,
                         album = album,
                         albumSongs = album.songs.sortedBy { it.name }
                     )
@@ -139,19 +137,19 @@ fun AlbumScreen(navController: NavController, albumId: String) {
 fun SumUpAlbumScreen(
     navController: NavController,
     albumViewModel: AlbumViewModel,
+    playerViewModel: PlayerViewModel,
     album: AlbumsModel,
     albumSongs: List<SongsModel>
 ) {
     val context = LocalContext.current
+    val likedSongIds by playerViewModel.likedSongIds.collectAsState()
+    val likedAlbumIds by playerViewModel.likedAlbumIds.collectAsState()
 
     var dominantColor by remember { mutableStateOf(Color(AppBackground.toArgb())) }
     Palette().extractSecondColorFromCoverUrl(context = context, album.image) { color ->
         dominantColor = color
     }
-
-    var isAlbumSaved by remember {
-        mutableStateOf(isAlbumLiked(context, album.id))
-    }
+    val isAlbumSaved = likedAlbumIds.contains(album.id)
 
     val totalDurationMs = albumSongs.sumOf { it.duration }
     val totalDurationText = formatTotalDuration(totalDurationMs)
@@ -287,9 +285,7 @@ fun SumUpAlbumScreen(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
                                     ) {
-                                        if (isAlbumSaved) removeLikedAlbumId(context, album.id)
-                                        else addLikedAlbumId(context, album.id)
-                                        isAlbumSaved = isAlbumLiked(context, album.id)
+                                        playerViewModel.toggleAlbumLike(album)
                                     },
                                 painter = if (isAlbumSaved) painterResource(R.drawable.added)
                                 else painterResource(R.drawable.ic_add),
@@ -312,10 +308,11 @@ fun SumUpAlbumScreen(
                                             indication = null
                                         ) {
                                             val shuffled = albumSongs.shuffled()
-                                            SongPlayer.playSong(shuffled[0], context)
-                                            albumViewModel.updateSongState(
-                                                shuffled[0].thumbnail, shuffled[0].name,
-                                                shuffled[0].singer, true, shuffled[0].id, 0, album.title
+                                            playerViewModel.startSongPlayback(
+                                                queueSongs = shuffled,
+                                                startIndex = 0,
+                                                album = album.title,
+                                                context = context
                                             )
                                         }
                                 ) {
@@ -352,10 +349,11 @@ fun SumUpAlbumScreen(
                                                     album.title
                                                 )
                                             } else {
-                                                SongPlayer.playSong(albumSongs[0], context)
-                                                albumViewModel.updateSongState(
-                                                    albumSongs[0].thumbnail, albumSongs[0].name,
-                                                    albumSongs[0].singer, true, albumSongs[0].id, 0, album.title
+                                                playerViewModel.startSongPlayback(
+                                                    queueSongs = albumSongs,
+                                                    startIndex = 0,
+                                                    album = album.title,
+                                                    context = context
                                                 )
                                             }
                                         }
@@ -379,9 +377,7 @@ fun SumUpAlbumScreen(
 
             // ── Song List ────────────────────────────────────────────────────
             albumSongs.forEachIndexed { index, song ->
-                var isLiked by remember { mutableStateOf(isSongLiked(context, song.id)) }
-                val likeState = albumViewModel.likeState.value
-                LaunchedEffect(likeState) { isLiked = isSongLiked(context, song.id) }
+                val isLiked = likedSongIds.contains(song.id)
 
                 val isPlaying = song.id == albumViewModel.currentSongId.value
                 val textColor = if (isPlaying) Color(AppPalette.toArgb()) else Color.White
@@ -396,10 +392,11 @@ fun SumUpAlbumScreen(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
-                            SongPlayer.playSong(song, context)
-                            albumViewModel.updateSongState(
-                                song.thumbnail, song.name, song.singer,
-                                true, song.id, index, album.title
+                            playerViewModel.startSongPlayback(
+                                queueSongs = albumSongs,
+                                startIndex = index,
+                                album = album.title,
+                                context = context
                             )
                         }
                 ) {
@@ -484,10 +481,7 @@ fun SumUpAlbumScreen(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
                                 ) {
-                                    if (isLiked) removeLikedSongId(context, song.id)
-                                    else addLikedSongId(context, song.id)
-                                    isLiked = isSongLiked(context, song.id)
-                                    albumViewModel.updateLikeState(!albumViewModel.likeState.value)
+                                    playerViewModel.toggleSongLike(song.id)
                                 },
                             painter = if (isLiked) painterResource(R.drawable.added)
                             else painterResource(R.drawable.ic_add),

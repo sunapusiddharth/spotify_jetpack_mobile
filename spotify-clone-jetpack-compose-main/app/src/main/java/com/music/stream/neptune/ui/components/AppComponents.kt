@@ -53,10 +53,8 @@ import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.bumptech.glide.integration.compose.placeholder
 import com.music.stream.neptune.R
-import com.music.stream.neptune.data.preferences.addLikedSongId
-import com.music.stream.neptune.data.preferences.isSongLiked
-import com.music.stream.neptune.data.preferences.removeLikedSongId
 import com.music.stream.neptune.di.Palette
+import com.music.stream.neptune.di.PlaybackMediaType
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.components.pressScale
@@ -102,8 +100,9 @@ fun MiniPlayer(navController: NavHostController) {
     var dragOffset by remember(songId) { mutableFloatStateOf(0f) }
     val expandInteractionSource = remember { MutableInteractionSource() }
     val context = LocalContext.current
-    var isLiked by remember { mutableStateOf(false) }
     val likeState = miniPlayerViewModel.likeState.value
+    val canLikeCurrentSong = miniPlayerViewModel.mediaType.value == PlaybackMediaType.SONG && songId.isNotBlank()
+    val isLiked = canLikeCurrentSong && likeState
     val likeScale by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (isLiked) 1.16f else 1f,
         animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 420f),
@@ -133,10 +132,6 @@ fun MiniPlayer(navController: NavHostController) {
     var darkVibrantColor by remember { mutableStateOf(Color(GridBackground.toArgb())) }
     Palette().extractFirstColorFromImageUrl(context = context, songCoverUri) { color ->
         darkVibrantColor = color
-    }
-
-    LaunchedEffect(likeState, songId) {
-        isLiked = isSongLiked(context, songId)
     }
 
     Column(
@@ -232,14 +227,13 @@ fun MiniPlayer(navController: NavHostController) {
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
-                            if (isLiked) removeLikedSongId(context, songId)
-                            else addLikedSongId(context, songId)
-                            isLiked = isSongLiked(context, songId)
-                            miniPlayerViewModel.updateLikeState(!likeState)
+                            if (canLikeCurrentSong) {
+                                miniPlayerViewModel.toggleSongLike(songId)
+                            }
                         },
                     painter = if (isLiked) painterResource(id = R.drawable.added)
                     else painterResource(id = R.drawable.ic_add),
-                    tint = Color.White,
+                    tint = if (canLikeCurrentSong) Color.White else Color.LightGray,
                     contentDescription = ""
                 )
                 Icon(

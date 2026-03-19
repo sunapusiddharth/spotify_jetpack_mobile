@@ -83,6 +83,18 @@ object SongPlayer {
         playSong(streamUrl, context, title, artist, artworkUri)
     }
 
+    fun prepareSong(
+        song: SongsModel,
+        context: Context,
+        title: String? = song.title,
+        artist: String? = song.singer,
+        artworkUri: String? = song.coverUri
+    ) {
+        if (!song.hasPlayableAudio) return
+        val streamUrl = buildSongStreamUrl(song.s3link)
+        prepareMedia(streamUrl, context, title, artist, artworkUri)
+    }
+
     fun playSong(
         song: String,
         context: Context,
@@ -90,8 +102,29 @@ object SongPlayer {
         artist: String? = null,
         artworkUri: String? = null
     ) {
+        setMedia(song, context, title, artist, artworkUri, playWhenReady = true)
+    }
+
+    fun prepareMedia(
+        song: String,
+        context: Context,
+        title: String? = null,
+        artist: String? = null,
+        artworkUri: String? = null
+    ) {
+        setMedia(song, context, title, artist, artworkUri, playWhenReady = false)
+    }
+
+    private fun setMedia(
+        song: String,
+        context: Context,
+        title: String? = null,
+        artist: String? = null,
+        artworkUri: String? = null,
+        playWhenReady: Boolean
+    ) {
         if (BuildConfig.ENABLE_HTTP_LOGGING) {
-            Log.d("SongPlayer", "Setting media item url=$song title=${title.orEmpty()} artist=${artist.orEmpty()} artwork=${artworkUri.orEmpty()}")
+            Log.d("SongPlayer", "Setting media item url=$song title=${title.orEmpty()} artist=${artist.orEmpty()} artwork=${artworkUri.orEmpty()} autoplay=$playWhenReady")
         }
         val exoPlayer = getOrCreatePlayer(context)
         startPlaybackService(context)
@@ -108,7 +141,7 @@ object SongPlayer {
 
         exoPlayer.setMediaItem(mediaItemBuilder.build())
         exoPlayer.prepare()
-        exoPlayer.playWhenReady = true
+        exoPlayer.playWhenReady = playWhenReady
     }
 
     fun isPlaying(): Boolean {

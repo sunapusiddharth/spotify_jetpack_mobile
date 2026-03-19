@@ -29,11 +29,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,15 +50,11 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.bumptech.glide.integration.compose.placeholder
 import com.music.stream.neptune.R
 import com.music.stream.neptune.data.entity.SongsModel
-import com.music.stream.neptune.data.preferences.addLikedSongId
-import com.music.stream.neptune.data.preferences.getLikedSongIds
 import com.music.stream.neptune.data.preferences.getSongsByIds
-import com.music.stream.neptune.data.preferences.isSongLiked
-import com.music.stream.neptune.data.preferences.removeLikedSongId
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
-import com.music.stream.neptune.ui.viewmodel.AlbumViewModel
+import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 
 /**
  * Liked Songs pseudo-album screen.
@@ -72,19 +66,12 @@ import com.music.stream.neptune.ui.viewmodel.AlbumViewModel
 fun LikedSongsScreen(
     songs: List<SongsModel>,
     navController: NavController,
-    context: Context
+    context: Context,
+    playerViewModel: PlayerViewModel
 ) {
-    val albumViewModel: AlbumViewModel = hiltViewModel()
-    val likedSongIds = getLikedSongIds(context)
-    var likedSongs by remember { mutableStateOf(emptyList<SongsModel>()) }
-
-    val likeState = albumViewModel.likeState.value
-    LaunchedEffect(likeState) {
-        likedSongs = getSongsByIds(getLikedSongIds(context), songs).sortedBy { it.name }
-    }
-    // Initial load
-    LaunchedEffect(Unit) {
-        likedSongs = getSongsByIds(likedSongIds, songs).sortedBy { it.name }
+    val likedSongIds by playerViewModel.likedSongIds.collectAsState()
+    val likedSongs = remember(songs, likedSongIds) {
+        getSongsByIds(likedSongIds, songs).sortedBy { it.name }
     }
 
     val gradientStart = Color(0xFF4A0880)
@@ -170,7 +157,7 @@ fun LikedSongsScreen(
                         )
                     }
 
-                    if (!albumViewModel.currentSongPlayingState.value && likedSongs.isNotEmpty()) {
+                    if (!playerViewModel.currentSongPlayingState.value && likedSongs.isNotEmpty()) {
                         Box(
                             contentAlignment = Alignment.Center,
                             modifier = Modifier
@@ -181,15 +168,11 @@ fun LikedSongsScreen(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
                                 ) {
-                                    SongPlayer.playSong(likedSongs[0], context)
-                                    albumViewModel.updateSongState(
-                                        likedSongs[0].thumbnail,
-                                        likedSongs[0].name,
-                                        likedSongs[0].singer,
-                                        true,
-                                        likedSongs[0].id,
-                                        0,
-                                        "Liked Songs"
+                                    playerViewModel.startSongPlayback(
+                                        queueSongs = likedSongs,
+                                        startIndex = 0,
+                                        album = "Liked Songs",
+                                        context = context
                                     )
                                 }
                         ) {
@@ -206,12 +189,10 @@ fun LikedSongsScreen(
 
             if (likedSongs.isNotEmpty()) {
                 repeat(likedSongs.size) { index ->
-                    var isLiked by remember {
-                        mutableStateOf(isSongLiked(context, likedSongs[index].id))
-                    }
                     val song = likedSongs[index]
+                    val isLiked = likedSongIds.contains(song.id)
                     val currentPlayingIndicatorColor =
-                        if (song.id == albumViewModel.currentSongId.value) Color(AppPalette.toArgb())
+                        if (song.id == playerViewModel.currentSongId.value) Color(AppPalette.toArgb())
                         else Color.White
 
                     Row(
@@ -224,15 +205,11 @@ fun LikedSongsScreen(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
                             ) {
-                                SongPlayer.playSong(song, context)
-                                albumViewModel.updateSongState(
-                                    song.thumbnail,
-                                    song.name,
-                                    song.singer,
-                                    true,
-                                    song.id,
-                                    index,
-                                    "Liked Songs"
+                                playerViewModel.startSongPlayback(
+                                    queueSongs = likedSongs,
+                                    startIndex = index,
+                                    album = "Liked Songs",
+                                    context = context
                                 )
                             }
                     ) {
@@ -273,9 +250,7 @@ fun LikedSongsScreen(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
                                 ) {
-                                    if (isLiked) removeLikedSongId(context, song.id)
-                                    else addLikedSongId(context, song.id)
-                                    albumViewModel.updateLikeState(!albumViewModel.likeState.value)
+                                    playerViewModel.toggleSongLike(song.id)
                                 },
                             painter = if (isLiked) painterResource(id = R.drawable.added)
                             else painterResource(id = R.drawable.ic_add),

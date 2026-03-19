@@ -1,77 +1,81 @@
-Issues:
+async getUserLikes(
+  userId: string,
+  pagination: PaginationDto
+): Promise<PaginatedResponse<LikedEntityResponse>> {
+  const page = Math.max(1, Number(pagination?.page) || 1);
+  const limit = Math.min(100, Math.max(1, Number(pagination?.limit) || 20));
+  const skip = (page - 1) * limit;
 
-Issue 1 : Home page Api being called is wrong 
+  const [likes, total] = await this.likesRepo.findAndCount({
+    where: { userId },
+    order: { likedAt: 'DESC' },
+    take: limit,
+    skip
+  });
 
-    We need to call 
-    export type HomePageInfo = {
-    results: HomePageDataType[],
-    page: number
-    }
-    export const fetchHomePageData = async (id: string, page: number): Promise<HomePageInfo> => {
-        console.log("home page api called here ",page,"id=",id)
-
-    if (!id) return {
-        page: page,
-        results: []
-    }
-
-
-    const res = await axios.get<HomePageInfo>(`${content_base_url}/users/${id}/home/${page}`);
-
-    if (res.status === 200) {
-        return {
-        page: res.data.page,
-        results: res.data.results
-        };
-    }
-    throw new Error('Network response not ok');
+  if (likes.length === 0) {
+    return {
+      items: [],
+      total: 0,
+      page,
+      limit,
+      hasMore: false
     };
+  }
 
-    we need to call these apis as well in home page and show them on screen
-    const { data: topStationsByVotesData, isLoading: loading0 } = useQuery(['browseStationsByCountry', 'US', 1], async () => await browseStationsByCountry('US', 1));
+  const entityIds = likes.map((like) => like.entityId);
+  const historyData = await this.getHistoryBatch(userId, entityIds);
 
-    const { data: editorsPlayListData, isLoading: loading234 } = useQuery(['editor_playlist'], async () => await getEditorsPlayList(10));
-    const { data: topArtists, isLoading: loadingTopArtists } = useQuery(['top_artists'], async () => await fetchTopArtists());
-    const { data: topScoringTracksForUser, isLoading: loadingtopTracksForuser } = useQuery(['topScoringTracksForUser'], async () => await getTopScoringSongsForuser(user?.id!, 30));
-    const { data: top10PodcastsData } = useQuery(["top_podcasts"], async () => await browsePodcasts(1));
+  const items = likes.map((like) =>
+    this.mapToLikedResponse(like, historyData.get(like.entityId))
+  );
 
-    const artCards = topArtists?.length ? uniqueBy<ArtistType>('id', topArtists)?.map(x => ({
-        image: x.image,
-        id: x.id,
-        title: x.title,
-        subtitle: '',
-        type: 'artists_card',
-        path: '/artist/' + x.id,
-        song: null
-    })) : []
-    const artists: HomePageDataType = {
-        cardType: 'artist_card',
-        label: 'Top Artists',
-        path: '/artist',
-        //@ts-expect-error
-        cards: artCards,
-        id: 'top_artists'
+  return {
+    items,
+    total,
+    page,
+    limit,
+    hasMore: skip + items.length < total
+  };
+}
+
+
+Keep this helper as a safe no-op on empty ids in the same file, or update it to this if you want it explicit:
+
+
+private async getHistoryBatch(
+  userId: string,
+  entityIds: string[]
+): Promise<Map<string, UserHistoryEntity>> {
+  if (!entityIds.length) {
+    return new Map();
+  }
+
+  const history = await this.historyRepo.find({
+    where: {
+      userId,
+      entityId: In(entityIds)
     }
+  });
+
+  return new Map(history.map((entry) => [entry.entityId, entry]));
+}
+
+Why this is the right fix for point 1:
+
+It normalizes page and limit.
+It returns an empty paginated payload when the user has no likes.
+It never tries to enrich from history if there are no like rows.
+It preserves the existing response shape the Android app expects.
+Expected empty response after this chang
 
 
-Issue 2: AvailableTracksScreen 
-    api being fired is wrong we need to fire 
-    we need to call this api
-    export const getAllAvailableSongs = async (skip: number, limit: number) => {
-    const res = await axios.get<AllTracksPageInfo>(`${content_base_url}/stream/all_available_songs/${skip}/${limit}`);
-    if (res.status === 200) {
-        return res.data;
-    }
-    throw new Error('Network response not ok');
-    };
+{
+  "items": [],
+  "total": 0,
+  "page": 1,
+  "limit": 20,
+  "hasMore": false
+}
 
 
-Issue 3: for PlaylistScreen we need to call 
-getPlaylistCollectionById
-
-
-Issue 4: media controls are not implemented or not working
-look at this for reference : https://developer.android.com/media/implement/surfaces/mobile
-
-
-All done

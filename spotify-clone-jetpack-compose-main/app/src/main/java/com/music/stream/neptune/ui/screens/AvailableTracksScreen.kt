@@ -44,19 +44,21 @@ import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.music.stream.neptune.data.api.Response
 import com.music.stream.neptune.data.entity.SongsModel
-import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.UnavailableAudioBadge
 import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.components.unavailableArtworkColorFilter
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.viewmodel.HomeViewModel
+import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AvailableTracksScreen() {
     val homeViewModel: HomeViewModel = hiltViewModel()
+    val playerViewModel: PlayerViewModel = hiltViewModel()
     val bgColor = Color(AppBackground.toArgb())
     val availableSongsPage by homeViewModel.availableSongsPage.collectAsState()
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         homeViewModel.fetchAvailableSongs(skip = 0, limit = 100)
@@ -101,6 +103,7 @@ fun AvailableTracksScreen() {
             }
             is Response.Success -> {
                 val displaySongs = (availableSongsPage as Response.Success).data.results
+                val playableSongs = remember(displaySongs) { displaySongs.filter { it.hasPlayableAudio } }
                 Log.d("AvailableTracks", "Loaded ${displaySongs.size} songs")
 
                 if (displaySongs.isEmpty()) {
@@ -144,7 +147,19 @@ fun AvailableTracksScreen() {
                         }
 
                         itemsIndexed(displaySongs, key = { _, song -> song.id.ifBlank { song.name } }) { index, song ->
-                            AvailableTrackRow(song = song, index = index + 1)
+                            AvailableTrackRow(
+                                song = song,
+                                index = index + 1,
+                                onPlay = {
+                                    val startIndex = playableSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                                    playerViewModel.startSongPlayback(
+                                        queueSongs = playableSongs,
+                                        startIndex = startIndex,
+                                        album = "available_tracks",
+                                        context = context
+                                    )
+                                }
+                            )
                         }
 
                         item {
@@ -159,8 +174,7 @@ fun AvailableTracksScreen() {
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-private fun AvailableTrackRow(song: SongsModel, index: Int) {
-    val context = LocalContext.current
+private fun AvailableTrackRow(song: SongsModel, index: Int, onPlay: () -> Unit) {
     val isPlayable = song.hasPlayableAudio
 
     Row(
@@ -174,7 +188,7 @@ private fun AvailableTrackRow(song: SongsModel, index: Int) {
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
-                SongPlayer.playSong(song, context)
+                onPlay()
             }
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically

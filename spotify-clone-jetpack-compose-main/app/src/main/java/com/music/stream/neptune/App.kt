@@ -67,6 +67,7 @@ fun App() {
         Routes.Home.route -> bottomBarState.value = true
         Routes.Search.route -> bottomBarState.value = true
         Routes.Library.route -> bottomBarState.value = true
+        Routes.Albums.route -> bottomBarState.value = true
         Routes.Podcast.route -> bottomBarState.value = true
         Routes.Radio.route -> bottomBarState.value = true
         Routes.AvailableTracks.route -> bottomBarState.value = true

@@ -56,6 +56,7 @@ private val drawerItems = listOf(
     DrawerItem(Icons.Default.Home, "Home", Routes.Home.route),
     DrawerItem(Icons.Default.Search, "Search", Routes.Search.route),
     DrawerItem(Icons.Default.LibraryMusic, "Your Library", Routes.Library.route),
+    DrawerItem(Icons.Default.GraphicEq, "Albums", Routes.Albums.route),
     DrawerItem(Icons.Default.Podcasts, "Podcasts", Routes.Podcast.route),
     DrawerItem(Icons.Default.Radio, "Radio", Routes.Radio.route),
     DrawerItem(Icons.Default.MusicNote, "Available Tracks", Routes.AvailableTracks.route),
