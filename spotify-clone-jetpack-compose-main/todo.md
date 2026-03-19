@@ -72,3 +72,6 @@ getPlaylistCollectionById
 
 Issue 4: media controls are not implemented or not working
 look at this for reference : https://developer.android.com/media/implement/surfaces/mobile
+
+
+All done
