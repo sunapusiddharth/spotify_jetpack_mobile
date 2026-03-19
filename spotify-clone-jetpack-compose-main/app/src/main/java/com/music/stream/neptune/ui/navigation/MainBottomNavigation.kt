@@ -19,7 +19,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -113,13 +112,7 @@ fun MainBottomNavigation(
                                         )
                                     }
                                 },
-                                label = {
-                                    if (currentRoute == item.route) {
-                                        Text(color = Color.White, text = item.label, fontSize = 11.sp)
-                                    } else {
-                                        Text(color = Color.Gray, text = item.label, fontSize = 11.sp)
-                                    }
-                                },
+                                label = null,
                                 onClick = {
                                     navController.navigate(item.route) {
                                         navController.graph.startDestinationRoute?.let {
@@ -129,7 +122,7 @@ fun MainBottomNavigation(
                                         }
                                     }
                                 },
-                                alwaysShowLabel = true,
+                                alwaysShowLabel = false,
                                 interactionSource = NoRippleInteractionSource(),
                                 colors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = Color.White,
@@ -148,9 +141,9 @@ fun MainBottomNavigation(
                                     contentDescription = "More"
                                 )
                             },
-                            label = { Text(color = Color.Gray, text = "More", fontSize = 11.sp) },
+                            label = null,
                             onClick = onMenuClick,
-                            alwaysShowLabel = true,
+                            alwaysShowLabel = false,
                             interactionSource = NoRippleInteractionSource(),
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = Color.White,

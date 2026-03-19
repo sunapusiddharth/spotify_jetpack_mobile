@@ -68,7 +68,9 @@ import com.music.stream.neptune.data.entity.RadioStationModel
 import com.music.stream.neptune.data.entity.SongsModel
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.Loader
+import com.music.stream.neptune.ui.components.StaggeredReveal
 import com.music.stream.neptune.ui.components.UnavailableAudioBadge
+import com.music.stream.neptune.ui.components.pressScale
 import com.music.stream.neptune.ui.components.unavailableArtworkColorFilter
 import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
@@ -76,6 +78,14 @@ import com.music.stream.neptune.ui.theme.GridBackground
 import com.music.stream.neptune.ui.viewmodel.HomeViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import kotlinx.coroutines.delay
+
+private val HomeSectionTitleSize = 16.sp
+private val HomeStandardCardSize = 98.dp
+private val HomeStandardCardWidth = 98.dp
+private val HomeSongCardSize = 101.dp
+private val HomeSongCardWidth = 101.dp
+private val HomeArtistCardSize = 85.dp
+private val HomeArtistCardWidth = 85.dp
 
 @Composable
 fun HomeScreen(navController: NavController) {
@@ -194,20 +204,22 @@ fun SumUpHomeScreen(
         state = listState
     ) {
         item {
-            GreetingSection()
+            StaggeredReveal(index = 0) {
+                HomeArtists(artists = artists, navController)
+            }
         }
 
         item {
-            HomeArtists(artists = artists, navController)
-        }
-
-        item {
-            HomePodcastsSection(navController = navController, podcasts = topPodcasts)
+            StaggeredReveal(index = 1) {
+                HomePodcastsSection(navController = navController, podcasts = topPodcasts)
+            }
         }
 
         if (editorsPlayList?.cards?.isNotEmpty() == true) {
             item(key = "editors_playlist") {
-                HomeCardSection(navController = navController, section = editorsPlayList, playerViewModel = playerViewModel)
+                StaggeredReveal(index = 2) {
+                    HomeCardSection(navController = navController, section = editorsPlayList, playerViewModel = playerViewModel)
+                }
             }
         }
 
@@ -215,15 +227,22 @@ fun SumUpHomeScreen(
             items = homeSections.filter { it.cards.isNotEmpty() },
             key = { section -> "home_section_${section.id.ifBlank { section.label + section.path }}" }
         ) { section ->
-            HomeCardSection(navController = navController, section = section, playerViewModel = playerViewModel)
+            val revealIndex = 3 + homeSections.indexOf(section).coerceAtLeast(0)
+            StaggeredReveal(index = revealIndex) {
+                HomeCardSection(navController = navController, section = section, playerViewModel = playerViewModel)
+            }
         }
 
         item {
-            HomeSongsSection(songs = topScoringSongs, playerViewModel = playerViewModel)
+            StaggeredReveal(index = 12) {
+                HomeSongsSection(songs = topScoringSongs, playerViewModel = playerViewModel)
+            }
         }
 
         item {
-            HomeStationsSection(navController = navController, stations = topStations)
+            StaggeredReveal(index = 13) {
+                HomeStationsSection(navController = navController, stations = topStations)
+            }
         }
 
         if (isLoadingNextHomePage) {
@@ -246,36 +265,8 @@ fun SumUpHomeScreen(
 }
 
 @Composable
-fun GreetingSection(name: String = "User") {
-    val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-    val greeting = when {
-        currentHour < 12 -> "Good Morning"
-        currentHour < 17 -> "Good Afternoon"
-        else -> "Good Evening"
-    }
-    Row(
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp, 12.dp, 16.dp, 0.dp)
-    ) {
-        Column(verticalArrangement = Arrangement.Center) {
-            Text(
-                text = greeting,
-                style = MaterialTheme.typography.headlineSmall,
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Have a Nice Day",
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.LightGray,
-                fontSize = 13.sp
-            )
-        }
-    }
+fun GreetingSection() {
+    Spacer(modifier = Modifier.height(6.dp))
 }
 
 @OptIn(ExperimentalGlideComposeApi::class)
@@ -296,7 +287,7 @@ private fun HomeCardSection(navController: NavController, section: HomePageSecti
         Text(
             text = section.label.ifBlank { "Recommended" },
             color = Color.White,
-            fontSize = 22.sp,
+            fontSize = HomeSectionTitleSize,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.clickable(
                 enabled = section.path.isNotBlank() || section.id.isNotBlank(),
@@ -312,13 +303,15 @@ private fun HomeCardSection(navController: NavController, section: HomePageSecti
         items(section.cards.size) { index ->
             val card = section.cards[index]
             val isPlayableSong = card.song?.hasPlayableAudio == true
+            val interactionSource = remember { MutableInteractionSource() }
             Box(
                 modifier = Modifier
-                    .padding(10.dp)
-                    .width(150.dp)
+                    .padding(8.dp)
+                    .width(HomeStandardCardWidth)
+                    .pressScale(interactionSource, pressedScale = 0.94f)
                     .clickable(
                         enabled = isPlayableSong,
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = interactionSource,
                         indication = null
                     ) {
                         card.song?.let { song ->
@@ -336,7 +329,7 @@ private fun HomeCardSection(navController: NavController, section: HomePageSecti
                     Box {
                         GlideImage(
                             modifier = Modifier
-                                .size(150.dp)
+                                .size(HomeStandardCardSize)
                                 .clip(RoundedCornerShape(8.dp)),
                             contentScale = ContentScale.Crop,
                             model = card.image,
@@ -353,16 +346,16 @@ private fun HomeCardSection(navController: NavController, section: HomePageSecti
                     Text(
                         text = card.title,
                         color = Color.White,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (card.subtitle.isNotEmpty()) {
+                    if (card.subtitle.isNotEmpty() && card.song == null) {
                         Text(
                             text = card.subtitle,
                             color = Color.Gray,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -397,20 +390,22 @@ private fun HomeSongsSection(songs: List<SongsModel>, playerViewModel: PlayerVie
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = "Top Tracks For You", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(text = "Top Tracks For You", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
     }
 
     LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
         items(songs.size) { index ->
             val song = songs[index]
             val isPlayable = song.hasPlayableAudio
+            val interactionSource = remember { MutableInteractionSource() }
             Box(
                 modifier = Modifier
-                    .padding(10.dp)
-                    .width(155.dp)
+                    .padding(8.dp)
+                    .width(HomeSongCardWidth)
+                    .pressScale(interactionSource, pressedScale = 0.94f)
                     .clickable(
                         enabled = isPlayable,
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = interactionSource,
                         indication = null
                     ) {
                         val startIndex = playableSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
@@ -426,7 +421,7 @@ private fun HomeSongsSection(songs: List<SongsModel>, playerViewModel: PlayerVie
                     Box {
                         GlideImage(
                             modifier = Modifier
-                                .size(155.dp)
+                                .size(HomeSongCardSize)
                                 .clip(RoundedCornerShape(8.dp)),
                             contentScale = ContentScale.Crop,
                             model = song.thumbnail,
@@ -440,14 +435,7 @@ private fun HomeSongsSection(songs: List<SongsModel>, playerViewModel: PlayerVie
                         }
                     }
                     Spacer(Modifier.height(8.dp))
-                    Text(text = song.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    Text(
-                        text = song.artists.joinToString(", ") { it.title },
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text(text = song.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     if (!isPlayable) {
                         Text(
                             text = "Audio unavailable",
@@ -475,18 +463,20 @@ private fun HomeStationsSection(navController: NavController, stations: List<Rad
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = "Top Stations", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(text = "Top Stations", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
     }
 
     LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
         items(stations.size) { index ->
             val station = stations[index]
+            val interactionSource = remember { MutableInteractionSource() }
             Box(
                 modifier = Modifier
-                    .padding(10.dp)
-                    .width(150.dp)
+                    .padding(8.dp)
+                    .width(HomeStandardCardWidth)
+                    .pressScale(interactionSource, pressedScale = 0.94f)
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = interactionSource,
                         indication = null
                     ) {
                         navController.navigate(Routes.Radio.route)
@@ -495,7 +485,7 @@ private fun HomeStationsSection(navController: NavController, stations: List<Rad
                 Column {
                     GlideImage(
                         modifier = Modifier
-                            .size(150.dp)
+                            .size(HomeStandardCardSize)
                             .clip(RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Crop,
                         model = station.coverUri,
@@ -504,8 +494,8 @@ private fun HomeStationsSection(navController: NavController, stations: List<Rad
                         contentDescription = station.name
                     )
                     Spacer(Modifier.height(8.dp))
-                    Text(text = station.name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    Text(text = station.country, color = Color.Gray, fontSize = 12.sp, maxLines = 1)
+                    Text(text = station.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(text = station.country, color = Color.Gray, fontSize = 11.sp, maxLines = 1)
                 }
             }
         }
@@ -524,18 +514,20 @@ private fun HomePodcastsSection(navController: NavController, podcasts: List<Pod
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = "Top Podcasts", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(text = "Top Podcasts", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
     }
 
     LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
         items(podcasts.size) { index ->
             val podcast = podcasts[index]
+            val interactionSource = remember { MutableInteractionSource() }
             Box(
                 modifier = Modifier
-                    .padding(10.dp)
-                    .width(150.dp)
+                    .padding(8.dp)
+                    .width(HomeStandardCardWidth)
+                    .pressScale(interactionSource, pressedScale = 0.94f)
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = interactionSource,
                         indication = null
                     ) {
                         navController.navigate("${Routes.PodcastDetail.route}/${podcast.id}")
@@ -544,7 +536,7 @@ private fun HomePodcastsSection(navController: NavController, podcasts: List<Pod
                 Column {
                     GlideImage(
                         modifier = Modifier
-                            .size(150.dp)
+                            .size(HomeStandardCardSize)
                             .clip(RoundedCornerShape(8.dp)),
                         contentScale = ContentScale.Crop,
                         model = podcast.image,
@@ -553,8 +545,8 @@ private fun HomePodcastsSection(navController: NavController, podcasts: List<Pod
                         contentDescription = podcast.title
                     )
                     Spacer(Modifier.height(8.dp))
-                    Text(text = podcast.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    Text(text = podcast.author, color = Color.Gray, fontSize = 12.sp, maxLines = 1)
+                    Text(text = podcast.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    Text(text = podcast.author, color = Color.Gray, fontSize = 11.sp, maxLines = 1)
                 }
             }
         }
@@ -787,19 +779,21 @@ fun HomeAlbums(album: List<AlbumsModel>, navController: NavController) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = "Albums", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(text = "Albums", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
     }
 
     LazyRow(modifier = Modifier.padding(6.dp)) {
         items(displayAlbums.size) { index ->
             val a = displayAlbums[index]
+            val interactionSource = remember { MutableInteractionSource() }
             Box(
                 modifier = Modifier
-                    .padding(10.dp)
-                    .width(150.dp)
-                    .height(195.dp)
+                    .padding(8.dp)
+                    .width(HomeStandardCardWidth)
+                    .height(132.dp)
+                    .pressScale(interactionSource, pressedScale = 0.94f)
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = interactionSource,
                         indication = null
                     ) {
                         navController.navigate("${Routes.Album.route}/${a.id}")
@@ -808,7 +802,7 @@ fun HomeAlbums(album: List<AlbumsModel>, navController: NavController) {
                 Column(horizontalAlignment = Alignment.Start) {
                     GlideImage(
                         modifier = Modifier
-                            .size(150.dp)
+                            .size(HomeStandardCardSize)
                             .clip(RoundedCornerShape(6.dp)),
                         contentScale = ContentScale.Crop,
                         model = a.image,
@@ -818,7 +812,7 @@ fun HomeAlbums(album: List<AlbumsModel>, navController: NavController) {
                     )
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         text = a.title,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
@@ -826,7 +820,7 @@ fun HomeAlbums(album: List<AlbumsModel>, navController: NavController) {
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         text = a.artists.firstOrNull()?.name ?: "",
                         color = Color.LightGray,
                         maxLines = 1,
@@ -853,7 +847,7 @@ fun HomeArtists(artists: List<ArtistsModel>, navController: NavController) {
         Text(
             text = "Best of Artists",
             color = Color.White,
-            fontSize = 22.sp,
+            fontSize = HomeSectionTitleSize,
             fontWeight = FontWeight.Bold
         )
     }
@@ -861,13 +855,15 @@ fun HomeArtists(artists: List<ArtistsModel>, navController: NavController) {
     LazyRow(modifier = Modifier.padding(6.dp)) {
         items(artists.size) { index ->
             val artist = artists[index]
+            val interactionSource = remember { MutableInteractionSource() }
             Box(
                 modifier = Modifier
-                    .padding(10.dp)
-                    .width(130.dp)
-                    .height(180.dp)
+                    .padding(8.dp)
+                    .width(HomeArtistCardWidth)
+                    .height(120.dp)
+                    .pressScale(interactionSource, pressedScale = 0.94f)
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = interactionSource,
                         indication = null
                     ) {
                         Log.d("check", "navigating to artist id=${artist.id}")
@@ -877,7 +873,7 @@ fun HomeArtists(artists: List<ArtistsModel>, navController: NavController) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     GlideImage(
                         modifier = Modifier
-                            .size(130.dp)
+                            .size(HomeArtistCardSize)
                             .clip(CircleShape),
                         contentScale = ContentScale.Crop,
                         model = artist.image,
@@ -890,7 +886,7 @@ fun HomeArtists(artists: List<ArtistsModel>, navController: NavController) {
                         modifier = Modifier.fillMaxWidth(),
                         text = artist.title,
                         color = Color.White,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
@@ -906,7 +902,7 @@ fun HomeArtists(artists: List<ArtistsModel>, navController: NavController) {
                         Text(
                             text = "$formatted listeners",
                             color = Color.Gray,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             textAlign = TextAlign.Center
                         )
                     }
@@ -926,18 +922,21 @@ fun ImageCard(
     modifier: Modifier = Modifier
 ) {
     val albums = allAlbums.takeLast(3)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp, 16.dp, 16.dp, 0.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    Column(
+        modifier = modifier.padding(0.dp, 0.dp, 0.dp, 50.dp)
     ) {
-        Text(text = "Discover", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-    }
-    Column(modifier = Modifier.padding(0.dp, 10.dp, 0.dp, 50.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp, 16.dp, 16.dp, 0.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "Discover", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
+        }
         repeat(albums.size) { index ->
             val a = albums[index]
+            val interactionSource = remember { MutableInteractionSource() }
             Card(
                 shape = RoundedCornerShape(15.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 5.dp),
@@ -945,8 +944,9 @@ fun ImageCard(
                     .padding(15.dp)
                     .fillMaxWidth()
                     .height(380.dp)
+                    .pressScale(interactionSource, pressedScale = 0.98f)
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = interactionSource,
                         indication = null
                     ) {
                         navController.navigate("${Routes.Album.route}/${a.id}")

@@ -3,10 +3,14 @@ package com.music.stream.neptune.ui.screens
 import android.content.Context
 import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -52,8 +56,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -74,9 +80,11 @@ import com.music.stream.neptune.di.Palette
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.CustomSlider
 import com.music.stream.neptune.ui.components.Snackbar
+import com.music.stream.neptune.ui.components.pressScale
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.AppPalette
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
+import kotlin.math.abs
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalGlideComposeApi::class)
@@ -96,6 +104,7 @@ fun PlayerScreen(navController: NavController) {
     var showPlaylistPicker by remember { mutableStateOf(false) }
     var selectedPlaylistIds by remember(songId) { mutableStateOf(setOf<String>()) }
     var newPlaylistName by remember(songId) { mutableStateOf("") }
+    var artworkDragOffset by remember(songId) { mutableStateOf(0f) }
 
     var songProgress by remember { mutableStateOf(maxOf(0f, SongPlayer.getCurrentPosition().toFloat())) }
     var songDurationText by remember { mutableStateOf("0:00") }
@@ -205,11 +214,63 @@ fun PlayerScreen(navController: NavController) {
                 modifier = Modifier
                     .size(360.dp)
                     .padding(20.dp)
+                    .graphicsLayer(translationX = artworkDragOffset)
+                    .pointerInput(songId, mediaType) {
+                        var totalDrag = 0f
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { change, dragAmount ->
+                                change.consume()
+                                totalDrag += dragAmount
+                                artworkDragOffset = (artworkDragOffset + dragAmount).coerceIn(-180f, 180f)
+                            },
+                            onDragEnd = {
+                                when {
+                                    totalDrag <= -120f -> playerViewModel.playNext(context)
+                                    totalDrag >= 120f -> playerViewModel.playPrevious(context)
+                                }
+                                totalDrag = 0f
+                                artworkDragOffset = 0f
+                            },
+                            onDragCancel = {
+                                totalDrag = 0f
+                                artworkDragOffset = 0f
+                            }
+                        )
+                    }
                     .clip(RoundedCornerShape(12.dp)),
                 model = songCoverUri,
                 contentScale = ContentScale.Crop,
                 contentDescription = ""
             )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 56.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_player_back),
+                    contentDescription = "Previous hint",
+                    tint = if (artworkDragOffset > 24f) {
+                        Color.White.copy(alpha = 0.28f + (abs(artworkDragOffset) / 220f).coerceIn(0f, 0.37f))
+                    } else {
+                        Color.White.copy(alpha = 0.14f)
+                    },
+                    modifier = Modifier.size(18.dp)
+                )
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_player_skip),
+                    contentDescription = "Next hint",
+                    tint = if (artworkDragOffset < -24f) {
+                        Color.White.copy(alpha = 0.28f + (abs(artworkDragOffset) / 220f).coerceIn(0f, 0.37f))
+                    } else {
+                        Color.White.copy(alpha = 0.14f)
+                    },
+                    modifier = Modifier.size(18.dp)
+                )
+            }
 
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -451,7 +512,6 @@ fun PlayerScreen(navController: NavController) {
                             }
                         }
                         is Response.Error -> Text("Failed to load playlists")
-                        else -> Text("Loading playlists...")
                     }
                 },
                 confirmButton = {
@@ -564,17 +624,28 @@ fun QueueSheet(
                 LazyColumn(state = listState) {
                     itemsIndexed(queueSongs) { index, song ->
                         val isCurrentSong = song.id == currentSongId
-                        val bgColor = if (isCurrentSong)
-                            Color.White.copy(alpha = 0.08f) else Color.Transparent
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val bgColor by animateColorAsState(
+                            targetValue = if (isCurrentSong) Color.White.copy(alpha = 0.08f) else Color.Transparent,
+                            animationSpec = spring(stiffness = 320f),
+                            label = "queueHighlight"
+                        )
+                        val itemScale by animateFloatAsState(
+                            targetValue = if (isCurrentSong) 1.015f else 1f,
+                            animationSpec = spring(dampingRatio = 0.75f, stiffness = 380f),
+                            label = "queueScale"
+                        )
 
                         Row(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .graphicsLayer(scaleX = itemScale, scaleY = itemScale)
                                 .background(bgColor)
+                                .pressScale(interactionSource, pressedScale = 0.985f)
                                 .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
+                                    interactionSource = interactionSource,
                                     indication = null
                                 ) {
                                     SongPlayer.playSong(song, context)
@@ -693,6 +764,11 @@ fun PlayerInfo(
     showLike: Boolean,
     onLike: () -> Unit
 ) {
+    val likeScale by animateFloatAsState(
+        targetValue = if (isLiked) 1.18f else 1f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = 420f),
+        label = "playerLikeScale"
+    )
     Row(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -724,7 +800,9 @@ fun PlayerInfo(
                     else painterResource(id = R.drawable.ic_add),
                     tint = if (isLiked) Color.Red else Color.White,
                     contentDescription = if (isLiked) "Unlike" else "Like",
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier
+                        .size(28.dp)
+                        .graphicsLayer(scaleX = likeScale, scaleY = likeScale)
                 )
             }
         }

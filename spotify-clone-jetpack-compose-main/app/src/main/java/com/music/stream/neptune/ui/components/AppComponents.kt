@@ -2,6 +2,7 @@ package com.music.stream.neptune.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,10 +35,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
@@ -55,10 +59,18 @@ import com.music.stream.neptune.data.preferences.removeLikedSongId
 import com.music.stream.neptune.di.Palette
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.navigation.Routes
+import com.music.stream.neptune.ui.components.pressScale
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.GridBackground
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import kotlinx.coroutines.delay
+import kotlin.math.abs
+
+private fun String.trimToWordLimit(maxWords: Int): String {
+    val words = trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+    if (words.size <= maxWords) return this.trim()
+    return words.take(maxWords).joinToString(" ") + "..."
+}
 
 @Composable
 fun Loader() {
@@ -86,6 +98,17 @@ fun MiniPlayer(navController: NavHostController) {
     val songId = miniPlayerViewModel.currentSongId.value
     val songIndex = miniPlayerViewModel.currentSongIndex.value
     val songAlbum = miniPlayerViewModel.currentSongAlbum.value
+    val compactSongTitle = remember(songTitle) { songTitle.trimToWordLimit(50) }
+    var dragOffset by remember(songId) { mutableFloatStateOf(0f) }
+    val expandInteractionSource = remember { MutableInteractionSource() }
+    val context = LocalContext.current
+    var isLiked by remember { mutableStateOf(false) }
+    val likeState = miniPlayerViewModel.likeState.value
+    val likeScale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isLiked) 1.16f else 1f,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 420f),
+        label = "miniLikeScale"
+    )
 
     var songProgress by remember { mutableFloatStateOf(0f) }
 
@@ -107,16 +130,11 @@ fun MiniPlayer(navController: NavHostController) {
             }
         }
     }
-
-    val context = LocalContext.current
-
     var darkVibrantColor by remember { mutableStateOf(Color(GridBackground.toArgb())) }
     Palette().extractFirstColorFromImageUrl(context = context, songCoverUri) { color ->
         darkVibrantColor = color
     }
 
-    var isLiked by remember { mutableStateOf(false) }
-    val likeState = miniPlayerViewModel.likeState.value
     LaunchedEffect(likeState, songId) {
         isLiked = isSongLiked(context, songId)
     }
@@ -128,6 +146,28 @@ fun MiniPlayer(navController: NavHostController) {
             .background(darkVibrantColor)
             .padding(8.dp, 0.dp)
             .clipToBounds()
+            .pointerInput(songId) {
+                var totalDrag = 0f
+                detectHorizontalDragGestures(
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        totalDrag += dragAmount
+                        dragOffset = (dragOffset + dragAmount).coerceIn(-120f, 120f)
+                    },
+                    onDragEnd = {
+                        when {
+                            totalDrag <= -90f -> miniPlayerViewModel.playNext(context)
+                            totalDrag >= 90f -> miniPlayerViewModel.playPrevious(context)
+                        }
+                        totalDrag = 0f
+                        dragOffset = 0f
+                    },
+                    onDragCancel = {
+                        totalDrag = 0f
+                        dragOffset = 0f
+                    }
+                )
+            }
     ) {
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -135,8 +175,10 @@ fun MiniPlayer(navController: NavHostController) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(0.dp, 4.dp)
+                .pressScale(expandInteractionSource, pressedScale = 0.985f)
+                .graphicsLayer(translationX = dragOffset)
                 .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
+                    interactionSource = expandInteractionSource,
                     indication = null
                 ) {
                     navController.navigate(Routes.Player.route)
@@ -159,8 +201,22 @@ fun MiniPlayer(navController: NavHostController) {
                     contentDescription = ""
                 )
                 Column(modifier = Modifier.widthIn(Dp.Unspecified, 200.dp)) {
-                    Text(text = songTitle, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text(text = songSinger, color = Color.LightGray, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        text = compactSongTitle,
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = songSinger,
+                        color = Color.LightGray,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
             Row(
@@ -171,6 +227,7 @@ fun MiniPlayer(navController: NavHostController) {
                 Icon(
                     modifier = Modifier
                         .size(22.dp)
+                        .graphicsLayer(scaleX = likeScale, scaleY = likeScale)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
@@ -212,6 +269,34 @@ fun MiniPlayer(navController: NavHostController) {
                 )
             }
         }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 1.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_player_back),
+                contentDescription = "Previous hint",
+                tint = if (dragOffset > 24f) {
+                    Color.White.copy(alpha = 0.25f + (abs(dragOffset) / 180f).coerceIn(0f, 0.4f))
+                } else {
+                    Color.White.copy(alpha = 0.12f)
+                },
+                modifier = Modifier.size(14.dp)
+            )
+            Icon(
+                painter = painterResource(id = R.drawable.ic_player_skip),
+                contentDescription = "Next hint",
+                tint = if (dragOffset < -24f) {
+                    Color.White.copy(alpha = 0.25f + (abs(dragOffset) / 180f).coerceIn(0f, 0.4f))
+                } else {
+                    Color.White.copy(alpha = 0.12f)
+                },
+                modifier = Modifier.size(14.dp)
+            )
+        }
         CustomSlider(
             value = songProgress,
             onValueChange = { newValue ->
@@ -240,7 +325,7 @@ fun CustomSlider(
     colors: SliderColors = SliderDefaults.colors(),
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(0.dp)
     ) {
