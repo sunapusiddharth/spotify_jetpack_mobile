@@ -80,12 +80,13 @@ import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import kotlinx.coroutines.delay
 
 private val HomeSectionTitleSize = 16.sp
+private val HomeSectionHeaderBottomGap = 9.5.dp
 private val HomeStandardCardSize = 98.dp
-private val HomeStandardCardWidth = 98.dp
+private val HomeStandardCardWidth = 112.dp
 private val HomeSongCardSize = 101.dp
-private val HomeSongCardWidth = 101.dp
+private val HomeSongCardWidth = 114.dp
 private val HomeArtistCardSize = 85.dp
-private val HomeArtistCardWidth = 85.dp
+private val HomeArtistCardWidth = 96.dp
 
 @Composable
 fun HomeScreen(navController: NavController) {
@@ -277,97 +278,107 @@ private fun HomeCardSection(navController: NavController, section: HomePageSecti
         section.cards.mapNotNull { it.song }.filter { it.hasPlayableAudio }
     }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp, 16.dp, 16.dp, 0.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = section.label.ifBlank { "Recommended" },
-            color = Color.White,
-            fontSize = HomeSectionTitleSize,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.clickable(
-                enabled = section.path.isNotBlank() || section.id.isNotBlank(),
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null
-            ) {
-                navigateToHomeSection(navController, section)
-            }
-        )
-    }
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp, 16.dp, 16.dp, 0.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = section.label.ifBlank { "Recommended" },
+                color = Color.White,
+                fontSize = HomeSectionTitleSize,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable(
+                    enabled = section.path.isNotBlank() || section.id.isNotBlank(),
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    navigateToHomeSection(navController, section)
+                }
+            )
+        }
 
-    LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
-        items(section.cards.size) { index ->
-            val card = section.cards[index]
-            val isPlayableSong = card.song?.hasPlayableAudio == true
-            val interactionSource = remember { MutableInteractionSource() }
-            Box(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .width(HomeStandardCardWidth)
-                    .pressScale(interactionSource, pressedScale = 0.94f)
-                    .clickable(
-                        enabled = isPlayableSong,
-                        interactionSource = interactionSource,
-                        indication = null
-                    ) {
-                        card.song?.let { song ->
-                            val startIndex = playableSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-                            playerViewModel.startSongPlayback(
-                                queueSongs = playableSongs,
-                                startIndex = startIndex,
-                                album = section.label.ifBlank { section.id.ifBlank { "home" } },
-                                context = context
+        Spacer(Modifier.height(HomeSectionHeaderBottomGap))
+
+        LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
+            items(section.cards.size) { index ->
+                val card = section.cards[index]
+                val isPlayableSong = card.song?.hasPlayableAudio == true
+                val interactionSource = remember { MutableInteractionSource() }
+                Box(
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .width(HomeStandardCardWidth)
+                        .height(172.dp)
+                        .pressScale(interactionSource, pressedScale = 0.94f)
+                        .clickable(
+                            enabled = isPlayableSong,
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) {
+                            card.song?.let { song ->
+                                val startIndex = playableSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                                playerViewModel.startSongPlayback(
+                                    queueSongs = playableSongs,
+                                    startIndex = startIndex,
+                                    album = section.label.ifBlank { section.id.ifBlank { "home" } },
+                                    context = context
+                                )
+                            }
+                        }
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Box {
+                            GlideImage(
+                                modifier = Modifier
+                                    .size(HomeStandardCardSize)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop,
+                                model = card.image,
+                                colorFilter = unavailableArtworkColorFilter(isPlayableSong),
+                                loading = placeholder(R.drawable.placeholder),
+                                failure = placeholder(R.drawable.placeholder),
+                                contentDescription = card.title
+                            )
+                            if (!isPlayableSong) {
+                                UnavailableAudioBadge(modifier = Modifier.align(Alignment.Center))
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = card.title,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            lineHeight = 15.sp,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (card.subtitle.isNotEmpty() && card.song == null) {
+                            Text(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = card.subtitle,
+                                color = Color.Gray,
+                                fontSize = 11.sp,
+                                lineHeight = 13.sp,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
-                    }
-            ) {
-                Column {
-                    Box {
-                        GlideImage(
-                            modifier = Modifier
-                                .size(HomeStandardCardSize)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop,
-                            model = card.image,
-                            colorFilter = unavailableArtworkColorFilter(isPlayableSong),
-                            loading = placeholder(R.drawable.placeholder),
-                            failure = placeholder(R.drawable.placeholder),
-                            contentDescription = card.title
-                        )
                         if (!isPlayableSong) {
-                            UnavailableAudioBadge(modifier = Modifier.align(Alignment.Center))
+                            Text(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = "Audio unavailable",
+                                color = Color(0xFFBDBDBD),
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = card.title,
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (card.subtitle.isNotEmpty() && card.song == null) {
-                        Text(
-                            text = card.subtitle,
-                            color = Color.Gray,
-                            fontSize = 11.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    if (!isPlayableSong) {
-                        Text(
-                            text = "Audio unavailable",
-                            color = Color(0xFFBDBDBD),
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
                     }
                 }
             }
@@ -383,63 +394,150 @@ private fun HomeSongsSection(songs: List<SongsModel>, playerViewModel: PlayerVie
     val context = LocalContext.current
     val playableSongs = remember(songs) { songs.filter { it.hasPlayableAudio } }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp, 16.dp, 16.dp, 0.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = "Top Tracks For You", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
-    }
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(15.dp, 16.dp, 16.dp, 0.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "Top Tracks For You", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
+        }
 
-    LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
-        items(songs.size) { index ->
-            val song = songs[index]
-            val isPlayable = song.hasPlayableAudio
-            val interactionSource = remember { MutableInteractionSource() }
-            Box(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .width(HomeSongCardWidth)
-                    .pressScale(interactionSource, pressedScale = 0.94f)
-                    .clickable(
-                        enabled = isPlayable,
-                        interactionSource = interactionSource,
-                        indication = null
-                    ) {
-                        val startIndex = playableSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-                        playerViewModel.startSongPlayback(
-                            queueSongs = playableSongs,
-                            startIndex = startIndex,
-                            album = "Top Tracks For You",
-                            context = context
-                        )
-                    }
-            ) {
-                Column {
-                    Box {
-                        GlideImage(
-                            modifier = Modifier
-                                .size(HomeSongCardSize)
-                                .clip(RoundedCornerShape(8.dp)),
-                            contentScale = ContentScale.Crop,
-                            model = song.thumbnail,
-                            colorFilter = unavailableArtworkColorFilter(isPlayable),
-                            loading = placeholder(R.drawable.placeholder),
-                            failure = placeholder(R.drawable.placeholder),
-                            contentDescription = song.title
+        Spacer(Modifier.height(HomeSectionHeaderBottomGap))
+
+        LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
+            items(songs.size) { index ->
+                val song = songs[index]
+                val isPlayable = song.hasPlayableAudio
+                val interactionSource = remember { MutableInteractionSource() }
+                Box(
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .width(HomeSongCardWidth)
+                        .height(150.dp)
+                        .pressScale(interactionSource, pressedScale = 0.94f)
+                        .clickable(
+                            enabled = isPlayable,
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) {
+                            val startIndex = playableSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                            playerViewModel.startSongPlayback(
+                                queueSongs = playableSongs,
+                                startIndex = startIndex,
+                                album = "Top Tracks For You",
+                                context = context
+                            )
+                        }
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Box {
+                            GlideImage(
+                                modifier = Modifier
+                                    .size(HomeSongCardSize)
+                                    .clip(RoundedCornerShape(8.dp)),
+                                contentScale = ContentScale.Crop,
+                                model = song.thumbnail,
+                                colorFilter = unavailableArtworkColorFilter(isPlayable),
+                                loading = placeholder(R.drawable.placeholder),
+                                failure = placeholder(R.drawable.placeholder),
+                                contentDescription = song.title
+                            )
+                            if (!isPlayable) {
+                                UnavailableAudioBadge(modifier = Modifier.align(Alignment.Center))
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = song.title,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            lineHeight = 15.sp,
+                            overflow = TextOverflow.Ellipsis
                         )
                         if (!isPlayable) {
-                            UnavailableAudioBadge(modifier = Modifier.align(Alignment.Center))
+                            Text(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = "Audio unavailable",
+                                color = Color(0xFFBDBDBD),
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    Text(text = song.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    if (!isPlayable) {
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+private fun HomeStationsSection(navController: NavController, stations: List<RadioStationModel>) {
+    if (stations.isEmpty()) return
+
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp, 16.dp, 16.dp, 0.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "Top Stations", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
+        }
+
+        Spacer(Modifier.height(HomeSectionHeaderBottomGap))
+
+        LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
+            items(stations.size) { index ->
+                val station = stations[index]
+                val interactionSource = remember { MutableInteractionSource() }
+                Box(
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .width(HomeStandardCardWidth)
+                        .height(150.dp)
+                        .pressScale(interactionSource, pressedScale = 0.94f)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) {
+                            navController.navigate(Routes.Radio.route)
+                        }
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        GlideImage(
+                            modifier = Modifier
+                                .size(HomeStandardCardSize)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop,
+                            model = station.coverUri,
+                            loading = placeholder(R.drawable.placeholder),
+                            failure = placeholder(R.drawable.placeholder),
+                            contentDescription = station.name
+                        )
+                        Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "Audio unavailable",
-                            color = Color(0xFFBDBDBD),
+                            modifier = Modifier.fillMaxWidth(),
+                            text = station.name,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            lineHeight = 15.sp,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = station.country,
+                            color = Color.Gray,
                             fontSize = 11.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -453,100 +551,70 @@ private fun HomeSongsSection(songs: List<SongsModel>, playerViewModel: PlayerVie
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-private fun HomeStationsSection(navController: NavController, stations: List<RadioStationModel>) {
-    if (stations.isEmpty()) return
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp, 16.dp, 16.dp, 0.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = "Top Stations", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
-    }
-
-    LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
-        items(stations.size) { index ->
-            val station = stations[index]
-            val interactionSource = remember { MutableInteractionSource() }
-            Box(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .width(HomeStandardCardWidth)
-                    .pressScale(interactionSource, pressedScale = 0.94f)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null
-                    ) {
-                        navController.navigate(Routes.Radio.route)
-                    }
-            ) {
-                Column {
-                    GlideImage(
-                        modifier = Modifier
-                            .size(HomeStandardCardSize)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop,
-                        model = station.coverUri,
-                        loading = placeholder(R.drawable.placeholder),
-                        failure = placeholder(R.drawable.placeholder),
-                        contentDescription = station.name
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(text = station.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    Text(text = station.country, color = Color.Gray, fontSize = 11.sp, maxLines = 1)
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalGlideComposeApi::class)
-@Composable
 private fun HomePodcastsSection(navController: NavController, podcasts: List<PodcastModel>) {
     if (podcasts.isEmpty()) return
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp, 16.dp, 16.dp, 0.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = "Top Podcasts", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
-    }
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp, 16.dp, 16.dp, 0.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "Top Podcasts", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
+        }
 
-    LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)) {
-        items(podcasts.size) { index ->
-            val podcast = podcasts[index]
-            val interactionSource = remember { MutableInteractionSource() }
-            Box(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .width(HomeStandardCardWidth)
-                    .pressScale(interactionSource, pressedScale = 0.94f)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null
-                    ) {
-                        navController.navigate("${Routes.PodcastDetail.route}/${podcast.id}")
+        Spacer(Modifier.height(HomeSectionHeaderBottomGap))
+
+        LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
+            items(podcasts.size) { index ->
+                val podcast = podcasts[index]
+                val interactionSource = remember { MutableInteractionSource() }
+                Box(
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .width(HomeStandardCardWidth)
+                        .height(150.dp)
+                        .pressScale(interactionSource, pressedScale = 0.94f)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) {
+                            navController.navigate("${Routes.PodcastDetail.route}/${podcast.id}")
+                        }
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        GlideImage(
+                            modifier = Modifier
+                                .size(HomeStandardCardSize)
+                                .clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop,
+                            model = podcast.image,
+                            loading = placeholder(R.drawable.placeholder),
+                            failure = placeholder(R.drawable.placeholder),
+                            contentDescription = podcast.title
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = podcast.title,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            lineHeight = 15.sp,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = podcast.author,
+                            color = Color.Gray,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-            ) {
-                Column {
-                    GlideImage(
-                        modifier = Modifier
-                            .size(HomeStandardCardSize)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop,
-                        model = podcast.image,
-                        loading = placeholder(R.drawable.placeholder),
-                        failure = placeholder(R.drawable.placeholder),
-                        contentDescription = podcast.title
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(text = podcast.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                    Text(text = podcast.author, color = Color.Gray, fontSize = 11.sp, maxLines = 1)
                 }
             }
         }
@@ -772,60 +840,70 @@ fun HomePlaylistGrid(navController: NavController, albums: List<AlbumsModel>) {
 fun HomeAlbums(album: List<AlbumsModel>, navController: NavController) {
     val displayAlbums = album.reversed()
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp, 16.dp, 16.dp, 0.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = "Albums", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
-    }
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp, 16.dp, 16.dp, 0.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = "Albums", color = Color.White, fontSize = HomeSectionTitleSize, fontWeight = FontWeight.Bold)
+        }
 
-    LazyRow(modifier = Modifier.padding(6.dp)) {
-        items(displayAlbums.size) { index ->
-            val a = displayAlbums[index]
-            val interactionSource = remember { MutableInteractionSource() }
-            Box(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .width(HomeStandardCardWidth)
-                    .height(132.dp)
-                    .pressScale(interactionSource, pressedScale = 0.94f)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null
+        Spacer(Modifier.height(HomeSectionHeaderBottomGap))
+
+        LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
+            items(displayAlbums.size) { index ->
+                val a = displayAlbums[index]
+                val interactionSource = remember { MutableInteractionSource() }
+                Box(
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .width(HomeStandardCardWidth)
+                        .height(152.dp)
+                        .pressScale(interactionSource, pressedScale = 0.94f)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) {
+                            navController.navigate("${Routes.Album.route}/${a.id}")
+                        }
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.Start
                     ) {
-                        navController.navigate("${Routes.Album.route}/${a.id}")
+                        GlideImage(
+                            modifier = Modifier
+                                .size(HomeStandardCardSize)
+                                .clip(RoundedCornerShape(6.dp)),
+                            contentScale = ContentScale.Crop,
+                            model = a.image,
+                            loading = placeholder(R.drawable.placeholder),
+                            failure = placeholder(R.drawable.placeholder),
+                            contentDescription = "Album"
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            fontSize = 12.sp,
+                            text = a.title,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            lineHeight = 15.sp,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            fontSize = 11.sp,
+                            text = a.artists.firstOrNull()?.name ?: "",
+                            color = Color.LightGray,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-            ) {
-                Column(horizontalAlignment = Alignment.Start) {
-                    GlideImage(
-                        modifier = Modifier
-                            .size(HomeStandardCardSize)
-                            .clip(RoundedCornerShape(6.dp)),
-                        contentScale = ContentScale.Crop,
-                        model = a.image,
-                        loading = placeholder(R.drawable.placeholder),
-                        failure = placeholder(R.drawable.placeholder),
-                        contentDescription = "Album"
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        fontSize = 12.sp,
-                        text = a.title,
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        fontSize = 11.sp,
-                        text = a.artists.firstOrNull()?.name ?: "",
-                        color = Color.LightGray,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
             }
         }
@@ -837,74 +915,85 @@ fun HomeAlbums(album: List<AlbumsModel>, navController: NavController) {
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun HomeArtists(artists: List<ArtistsModel>, navController: NavController) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(20.dp, 16.dp, 16.dp, 0.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = "Best of Artists",
-            color = Color.White,
-            fontSize = HomeSectionTitleSize,
-            fontWeight = FontWeight.Bold
-        )
-    }
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp, 16.dp, 16.dp, 0.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Best of Artists",
+                color = Color.White,
+                fontSize = HomeSectionTitleSize,
+                fontWeight = FontWeight.Bold
+            )
+        }
 
-    LazyRow(modifier = Modifier.padding(6.dp)) {
-        items(artists.size) { index ->
-            val artist = artists[index]
-            val interactionSource = remember { MutableInteractionSource() }
-            Box(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .width(HomeArtistCardWidth)
-                    .height(120.dp)
-                    .pressScale(interactionSource, pressedScale = 0.94f)
-                    .clickable(
-                        interactionSource = interactionSource,
-                        indication = null
-                    ) {
-                        Log.d("check", "navigating to artist id=${artist.id}")
-                        navController.navigate("${Routes.Artist.route}/${artist.id}")
-                    }
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    GlideImage(
-                        modifier = Modifier
-                            .size(HomeArtistCardSize)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop,
-                        model = artist.image,
-                        loading = placeholder(R.drawable.placeholder),
-                        failure = placeholder(R.drawable.placeholder),
-                        contentDescription = "Artist"
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = artist.title,
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    val listeners = artist.monthly_listeners
-                    if (listeners > 0) {
-                        val formatted = when {
-                            listeners >= 1_000_000 -> "${listeners / 1_000_000}M"
-                            listeners >= 1_000 -> "${listeners / 1_000}K"
-                            else -> "$listeners"
+        Spacer(Modifier.height(HomeSectionHeaderBottomGap))
+
+        LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
+            items(artists.size) { index ->
+                val artist = artists[index]
+                val interactionSource = remember { MutableInteractionSource() }
+                Box(
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .width(HomeArtistCardWidth)
+                        .height(132.dp)
+                        .pressScale(interactionSource, pressedScale = 0.94f)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = null
+                        ) {
+                            Log.d("check", "navigating to artist id=${artist.id}")
+                            navController.navigate("${Routes.Artist.route}/${artist.id}")
                         }
-                        Text(
-                            text = "$formatted listeners",
-                            color = Color.Gray,
-                            fontSize = 10.sp,
-                            textAlign = TextAlign.Center
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        GlideImage(
+                            modifier = Modifier
+                                .size(HomeArtistCardSize)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop,
+                            model = artist.image,
+                            loading = placeholder(R.drawable.placeholder),
+                            failure = placeholder(R.drawable.placeholder),
+                            contentDescription = "Artist"
                         )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = artist.title,
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            lineHeight = 15.sp,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        val listeners = artist.monthly_listeners
+                        if (listeners > 0) {
+                            val formatted = when {
+                                listeners >= 1_000_000 -> "${listeners / 1_000_000}M"
+                                listeners >= 1_000 -> "${listeners / 1_000}K"
+                                else -> "$listeners"
+                            }
+                            Text(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = "$formatted listeners",
+                                color = Color.Gray,
+                                fontSize = 10.sp,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
