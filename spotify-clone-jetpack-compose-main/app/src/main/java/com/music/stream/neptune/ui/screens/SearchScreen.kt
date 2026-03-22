@@ -22,15 +22,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -46,10 +50,15 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -75,8 +84,8 @@ import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.SearchViewModel
 import kotlinx.coroutines.delay
 
-enum class SearchFilter(val label: String, val apiType: String) {
-    ALL("All", "null"),
+enum class SearchFilter(val label: String, val apiType: String?) {
+    ALL("All", null),
     SONGS("Songs", "songs"),
     ALBUMS("Albums", "album"),
     ARTISTS("Artists", "artist")
@@ -131,13 +140,38 @@ fun SumUpSearchScreen(
     var text by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf(SearchFilter.ALL) }
     val searchResults by searchViewModel.searchResults.collectAsState()
+    val recentSearchesState by searchViewModel.recentSearches.collectAsState()
+    val autocompleteState by searchViewModel.autocompleteSuggestions.collectAsState()
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val initialListPosition = remember {
+        ScreenScrollMemory.lazyListPositions[Routes.Search.route] ?: SavedLazyListPosition()
+    }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialListPosition.index,
+        initialFirstVisibleItemScrollOffset = initialListPosition.offset
+    )
+
+    DisposableEffect(listState) {
+        onDispose {
+            ScreenScrollMemory.lazyListPositions[Routes.Search.route] = SavedLazyListPosition(
+                index = listState.firstVisibleItemIndex,
+                offset = listState.firstVisibleItemScrollOffset
+            )
+        }
+    }
 
     LaunchedEffect(text, selectedFilter) {
         if (text.isNotBlank()) {
             delay(400)
             searchViewModel.search(text, selectedFilter.apiType)
+            searchViewModel.loadAutocomplete(text)
+        } else {
+            searchViewModel.loadRecentSearches()
         }
     }
+
+    val recentSearches = (recentSearchesState as? Response.Success)?.data.orEmpty()
+    val autocompleteSuggestions = (autocompleteState as? Response.Success)?.data.orEmpty()
 
     val localFiltered = remember(text, localSongs) {
         if (text.isBlank()) localSongs
@@ -152,7 +186,8 @@ fun SumUpSearchScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(AppBackground.toArgb()))
-            .statusBarsPadding()
+            .statusBarsPadding(),
+        state = listState
     ) {
         item {
             Row(
@@ -169,10 +204,19 @@ fun SumUpSearchScreen(
         }
 
         item {
-            SearchStickyBar(text) { newText ->
+            SearchStickyBar(
+                text = text,
+                onTextChange = { newText ->
                 text = newText
                 if (newText.isBlank()) searchViewModel.search("")
-            }
+                },
+                onSearch = {
+                    if (text.isNotBlank()) {
+                        searchViewModel.submitSearch(text, selectedFilter.apiType)
+                        keyboardController?.hide()
+                    }
+                }
+            )
         }
 
         item {
@@ -195,6 +239,37 @@ fun SumUpSearchScreen(
                         )
                     )
                 }
+            }
+        }
+
+        if (text.isBlank() && recentSearches.isNotEmpty()) {
+            item {
+                RecentSearchesSection(
+                    recentSearches = recentSearches,
+                    onSelect = { query ->
+                        text = query
+                        searchViewModel.submitSearch(query, selectedFilter.apiType)
+                    },
+                    onRemove = { query ->
+                        searchViewModel.removeRecentSearch(query)
+                    },
+                    onClearAll = {
+                        searchViewModel.clearRecentSearches()
+                    }
+                )
+            }
+        }
+
+        if (text.isNotBlank() && autocompleteSuggestions.isNotEmpty()) {
+            item {
+                AutocompleteSection(
+                    suggestions = autocompleteSuggestions,
+                    onSelect = { query ->
+                        text = query
+                        searchViewModel.submitSearch(query, selectedFilter.apiType)
+                        keyboardController?.hide()
+                    }
+                )
             }
         }
 
@@ -340,6 +415,91 @@ fun SumUpSearchScreen(
         }
 
         item { Spacer(modifier = Modifier.height(130.dp)) }
+    }
+}
+
+@Composable
+private fun RecentSearchesSection(
+    recentSearches: List<String>,
+    onSelect: (String) -> Unit,
+    onRemove: (String) -> Unit,
+    onClearAll: () -> Unit
+) {
+    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Recent Searches",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Clear",
+                color = Color.LightGray,
+                fontSize = 12.sp,
+                modifier = Modifier.clickable(indication = null, interactionSource = remember { MutableInteractionSource() }) {
+                    onClearAll()
+                }
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        recentSearches.forEach { query ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onSelect(query) }
+                    .padding(vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(text = query, color = Color.White, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                IconButton(onClick = { onRemove(query) }) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Remove recent search",
+                        tint = Color.Gray
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AutocompleteSection(
+    suggestions: List<String>,
+    onSelect: (String) -> Unit
+) {
+    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+        suggestions.forEach { suggestion ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { onSelect(suggestion) }
+                    .padding(vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_search_big),
+                    tint = Color.Gray,
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 10.dp)
+                )
+                Text(text = suggestion, color = Color.White, fontSize = 14.sp)
+            }
+        }
     }
 }
 
@@ -874,7 +1034,7 @@ private fun SearchCardModel.toSongsModel(): SongsModel {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SearchStickyBar(text: String, onTextChange: (String) -> Unit) {
+fun SearchStickyBar(text: String, onTextChange: (String) -> Unit, onSearch: () -> Unit) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -908,6 +1068,8 @@ fun SearchStickyBar(text: String, onTextChange: (String) -> Unit) {
                 cursorColor = Color.Black
             ),
             singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { onSearch() }),
             onValueChange = onTextChange,
             placeholder = {
                 Text(

@@ -84,7 +84,7 @@ fun PlaylistScreen(navController: NavController, playlistId: String) {
     val context = LocalContext.current
 
     LaunchedEffect(playlistId) {
-        viewModel.loadPlaylistCollection(playlistId)
+        viewModel.loadPlaylist(playlistId)
     }
 
     val bgColor = Color(AppBackground.toArgb())
@@ -101,7 +101,6 @@ fun PlaylistScreen(navController: NavController, playlistId: String) {
                 if (playlist != null) {
                     PlaylistCollectionContent(
                         playlist = playlist,
-                        navController = navController,
                         viewModel = viewModel,
                         context = context
                     )
@@ -162,7 +161,6 @@ fun PlaylistCollectionScreen(navController: NavController, collectionId: String)
                 if (collection != null) {
                     PlaylistCollectionContent(
                         playlist = collection,
-                        navController = navController,
                         viewModel = viewModel,
                         context = context
                     )
@@ -202,7 +200,6 @@ fun PlaylistCollectionScreen(navController: NavController, collectionId: String)
 @Composable
 private fun PlaylistCollectionContent(
     playlist: AlbumsModel,
-    navController: NavController,
     viewModel: AlbumViewModel,
     context: Context
 ) {

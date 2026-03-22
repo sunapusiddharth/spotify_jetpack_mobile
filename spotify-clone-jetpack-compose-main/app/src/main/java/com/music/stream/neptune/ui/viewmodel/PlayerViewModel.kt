@@ -76,6 +76,9 @@ class PlayerViewModel @Inject constructor(
     private val _actionMessage = MutableStateFlow<String?>(null)
     val actionMessage: StateFlow<String?> = _actionMessage
 
+    private val _isPlayerExpanded = MutableStateFlow(false)
+    val isPlayerExpanded: StateFlow<Boolean> = _isPlayerExpanded
+
     private val _userPlaylists: MutableStateFlow<Response<List<UserPlaylistModel>>> =
         MutableStateFlow(Response.Loading())
     val userPlaylists: StateFlow<Response<List<UserPlaylistModel>>> = _userPlaylists
@@ -799,5 +802,13 @@ class PlayerViewModel @Inject constructor(
 
     fun clearActionMessage() {
         _actionMessage.value = null
+    }
+
+    fun expandPlayer() {
+        _isPlayerExpanded.value = true
+    }
+
+    fun collapsePlayer() {
+        _isPlayerExpanded.value = false
     }
 }

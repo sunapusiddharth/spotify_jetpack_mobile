@@ -27,11 +27,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,8 +61,21 @@ fun AlbumsScreen(navController: NavController) {
     val allAlbumsState by viewModel.allAlbums.collectAsState()
     val isLoadingMore by viewModel.isLoadingMore.collectAsState()
     val hasMore by viewModel.hasMore.collectAsState()
-    val listState = rememberSaveable(saver = LazyListState.Saver) {
-        LazyListState()
+    val initialListPosition = remember {
+        ScreenScrollMemory.lazyListPositions[Routes.Albums.route] ?: SavedLazyListPosition()
+    }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialListPosition.index,
+        initialFirstVisibleItemScrollOffset = initialListPosition.offset
+    )
+
+    DisposableEffect(listState) {
+        onDispose {
+            ScreenScrollMemory.lazyListPositions[Routes.Albums.route] = SavedLazyListPosition(
+                index = listState.firstVisibleItemIndex,
+                offset = listState.firstVisibleItemScrollOffset
+            )
+        }
     }
 
     LaunchedEffect(listState.canScrollForward, hasMore, isLoadingMore, allAlbumsState) {

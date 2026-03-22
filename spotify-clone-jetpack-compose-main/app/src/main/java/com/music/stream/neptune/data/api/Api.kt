@@ -1,6 +1,7 @@
 package com.music.stream.neptune.data.api
 
 import android.util.Log
+import com.music.stream.neptune.auth.UserSessionManager
 import com.music.stream.neptune.data.entity.AlbumsModel
 import com.music.stream.neptune.data.entity.ArtistsModel
 import com.music.stream.neptune.data.entity.HomePageInfoModel
@@ -21,6 +22,7 @@ import com.music.stream.neptune.data.entity.UserModel
 import com.music.stream.neptune.data.entity.UserPlaylistModel
 import com.music.stream.neptune.data.entity.web.toDomain
 import com.music.stream.neptune.data.network.AddSongToPlaylistRequest
+import com.music.stream.neptune.data.network.AddSearchQueryRequest
 import com.music.stream.neptune.data.network.ArtistSongsPaginationResponse
 import com.music.stream.neptune.data.network.CreatePlaylistRequest
 import com.music.stream.neptune.data.network.HistoryEntityResponseDto
@@ -45,7 +47,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class Api @Inject constructor(private val networkApi: NetworkApi) {
+class Api @Inject constructor(
+    private val networkApi: NetworkApi,
+    private val userSessionManager: UserSessionManager
+) {
     private val gson = Gson()
 
     // In-memory caches to avoid repeated network calls
@@ -76,7 +81,19 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         title = title,
         image = image.orEmpty(),
         s3link = s3link.orEmpty(),
-        subtitle = albumName ?: podcastName.orEmpty(),
+        subtitle = album?.title ?: albumName ?: podcastName.orEmpty(),
+        artists = artists.map {
+            SongsModel.ArtistRef(
+                title = it.title,
+                id = it.id,
+                path = it.path
+            )
+        },
+        album = SongsModel.AlbumRef(
+            title = album?.title ?: albumName.orEmpty(),
+            id = album?.id.orEmpty(),
+            path = album?.path.orEmpty()
+        ),
         episodeNumber = episodeNumber,
         likedAt = likedAt
     )
@@ -87,7 +104,19 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         title = title,
         image = image.orEmpty(),
         s3link = s3link.orEmpty(),
-        subtitle = albumName ?: podcastName.orEmpty(),
+        subtitle = album?.title ?: albumName ?: podcastName.orEmpty(),
+        artists = artists.map {
+            SongsModel.ArtistRef(
+                title = it.title,
+                id = it.id,
+                path = it.path
+            )
+        },
+        album = SongsModel.AlbumRef(
+            title = album?.title ?: albumName.orEmpty(),
+            id = album?.id.orEmpty(),
+            path = album?.path.orEmpty()
+        ),
         episodeNumber = episodeNumber,
         watchedDuration = watchedDuration,
         totalDuration = totalDuration,
@@ -145,7 +174,12 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
                 return@flow
             }
 
-            val user = networkApi.getUserById(userId).toDomain()
+            val existing = cachedUser?.takeIf { it.id == userId }
+            val user = networkApi.getUserById(userId).toDomain().copy(
+                likedSongs = existing?.likedSongs.orEmpty(),
+                tracks = existing?.tracks.orEmpty(),
+                artists = existing?.artists.orEmpty()
+            )
             cachedUser = user
             likedSongIds.value = user.likedSongs.toSet()
             emit(Response.Success(user))
@@ -284,15 +318,7 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
                 return@flow
             }
             val result = networkApi.getHomePage(userId, page)
-            val sections = parseHomeSections(result.get("results"))
-            emit(
-                Response.Success(
-                    HomePageInfoModel(
-                        results = sections.map { it.toDomain() },
-                        page = result.get("page")?.takeIf { !it.isJsonNull }?.asInt ?: page
-                    )
-                )
-            )
+            emit(Response.Success(parseHomePageInfo(result, page)))
         } catch (e: Exception) {
             Log.e("Api", "Error fetching home page for $userId: ${e.message}")
             emit(Response.Error(e.message ?: "Unknown error"))
@@ -309,6 +335,44 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
+    private fun parseHomePageInfo(element: JsonElement, fallbackPage: Int): HomePageInfoModel {
+        return when {
+            element.isJsonArray -> HomePageInfoModel(
+                results = parseHomeSections(element).map { it.toDomain() },
+                page = fallbackPage
+            )
+
+            element.isJsonObject -> {
+                val obj = element.asJsonObject
+                val sectionsElement = obj.get("results") ?: obj.get("items") ?: obj.get("data") ?: element
+                HomePageInfoModel(
+                    results = parseHomeSections(sectionsElement).map { it.toDomain() },
+                    page = obj.get("page")?.takeIf { !it.isJsonNull }?.asInt ?: fallbackPage
+                )
+            }
+
+            else -> HomePageInfoModel(page = fallbackPage)
+        }
+    }
+
+    private fun parseCreatedPlaylist(element: JsonElement, fallbackName: String): UserPlaylistModel {
+        if (!element.isJsonObject) {
+            return UserPlaylistModel(name = fallbackName)
+        }
+
+        val obj = element.asJsonObject
+        return UserPlaylistModel(
+            id = obj.get("id")?.takeIf { !it.isJsonNull }?.asString
+                ?: obj.get("pid")?.takeIf { !it.isJsonNull }?.asString
+                .orEmpty(),
+            name = obj.get("name")?.takeIf { !it.isJsonNull }?.asString
+                ?: obj.get("title")?.takeIf { !it.isJsonNull }?.asString
+                ?: fallbackName,
+            image = obj.get("image")?.takeIf { !it.isJsonNull }?.asString.orEmpty(),
+            tracks = emptyList()
+        )
+    }
+
     private fun parseHomeSectionObject(element: JsonObject): com.music.stream.neptune.data.entity.web.WebHomePageDataType? {
         if (element.entrySet().isEmpty()) return null
 
@@ -322,6 +386,88 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         return section.takeIf { hasMeaningfulData }
     }
 
+    private fun parseStringListPayload(element: JsonElement?): List<String> {
+        if (element == null || element.isJsonNull) return emptyList()
+
+        fun parseArray(arrayElement: JsonElement?): List<String> {
+            if (arrayElement == null || !arrayElement.isJsonArray) return emptyList()
+            return arrayElement.asJsonArray.mapNotNull { item ->
+                when {
+                    item == null || item.isJsonNull -> null
+                    item.isJsonPrimitive -> item.asString
+                    item.isJsonObject -> {
+                        val obj = item.asJsonObject
+                        listOf("query", "value", "name", "title", "label")
+                            .firstNotNullOfOrNull { key ->
+                                obj.get(key)?.takeIf { !it.isJsonNull }?.asString
+                            }
+                    }
+                    else -> null
+                }
+            }
+        }
+
+        return when {
+            element.isJsonArray -> parseArray(element)
+            element.isJsonObject -> {
+                val obj = element.asJsonObject
+                listOf("results", "items", "queries", "recent", "suggestions", "data")
+                    .firstNotNullOfOrNull { key -> parseArray(obj.get(key)).takeIf { it.isNotEmpty() } }
+                    ?: emptyList()
+            }
+            else -> emptyList()
+        }
+    }
+
+    private fun parseSearchResultPayload(element: JsonElement): Response<SearchResultModel> {
+        if (!element.isJsonObject) {
+            return Response.Success(SearchResultModel())
+        }
+
+        val obj = element.asJsonObject
+        val message = obj.get("message")?.takeIf { !it.isJsonNull }?.asString
+        val hasErrorEnvelope = obj.has("statusCode") || obj.has("error")
+        val cardsElement = listOf("cards", "results", "items", "data")
+            .mapNotNull(obj::get)
+            .firstOrNull { it.isJsonArray }
+
+        if (hasErrorEnvelope && cardsElement == null) {
+            return Response.Error(message ?: "Search failed")
+        }
+
+        val cards = cardsElement?.asJsonArray?.mapNotNull { cardElement ->
+            runCatching {
+                gson.fromJson(
+                    cardElement,
+                    com.music.stream.neptune.data.entity.web.WebSearchCard::class.java
+                )
+            }.getOrNull()
+        }?.map {
+            com.music.stream.neptune.data.entity.SearchCardModel(
+                play_url = it.play_url.orEmpty(),
+                s3link = it.s3link.orEmpty(),
+                id = it.id,
+                image = it.image,
+                name = it.name,
+                artist = it.artist,
+                type = it.type
+            )
+        }.orEmpty()
+
+        val total = obj.get("total")?.takeIf { !it.isJsonNull }?.asInt ?: cards.size
+        val took = obj.get("took")?.takeIf { !it.isJsonNull }?.asInt ?: 0
+        val type = obj.get("type")?.takeIf { !it.isJsonNull }?.asString.orEmpty()
+
+        return Response.Success(
+            SearchResultModel(
+                total = total,
+                took = took,
+                cards = cards,
+                type = type
+            )
+        )
+    }
+
     suspend fun getSongs(): Flow<Response<List<SongsModel>>> = flow {
         emit(Response.Loading())
         try {
@@ -330,7 +476,7 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
                 emit(Response.Success(cached))
                 return@flow
             }
-            val songs = networkApi.getAllAvailableSongs(0, 500).results.map { it.toDomain() }.distinctBy { it.id }
+            val songs = networkApi.getAllAvailableSongs(0, 50).results.map { it.toDomain() }.distinctBy { it.id }
             cachedSongs = songs
             Log.d("Api", "Fetched ${songs.size} songs from available songs endpoint")
             emit(Response.Success(songs))
@@ -403,39 +549,101 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
         }
     }
 
-    suspend fun searchAll(query: String, type: String, page: Int): Flow<Response<SearchResultModel>> = flow {
+    suspend fun searchAll(query: String, type: String?, page: Int): Flow<Response<SearchResultModel>> = flow {
         emit(Response.Loading())
         try {
-            val result = networkApi.searchAll(query, type, page).toDomain()
-            emit(Response.Success(result))
+            val userId = userSessionManager.userIdOrEmail()
+            if (userId.isBlank()) {
+                emit(Response.Success(SearchResultModel()))
+                return@flow
+            }
+
+            val normalizedType = type?.takeUnless { it.isBlank() }
+            emit(parseSearchResultPayload(networkApi.searchAll(userId, query, page, normalizedType)))
         } catch (e: Exception) {
             Log.e("Api", "Error searching '$query': ${e.message}")
             emit(Response.Error(e.message ?: "Unknown error"))
         }
     }
 
-    suspend fun getTopScoringSongs(limit: Int): Flow<Response<List<SongsModel>>> = flow {
+    suspend fun getRecentSearches(): Flow<Response<List<String>>> = flow {
         emit(Response.Loading())
         try {
-            val result = networkApi.getTopScoringSongs(limit).map { it.toDomain() }
-            emit(Response.Success(result))
-        } catch (e: Exception) {
-            Log.e("Api", "Error fetching top scoring songs: ${e.message}")
-            emit(Response.Error(e.message ?: "Unknown error"))
-        }
-    }
-
-    suspend fun getTopScoringSongsForUser(userId: String, limit: Int): Flow<Response<List<SongsModel>>> = flow {
-        emit(Response.Loading())
-        try {
+            val userId = userSessionManager.userIdOrEmail()
             if (userId.isBlank()) {
                 emit(Response.Success(emptyList()))
                 return@flow
             }
-            val result = networkApi.getTopScoringSongsForUser(userId, limit).map { it.toDomain() }
-            emit(Response.Success(result))
+
+            emit(Response.Success(parseStringListPayload(networkApi.getRecentSearches(userId))))
         } catch (e: Exception) {
-            Log.e("Api", "Error fetching user top scoring songs: ${e.message}")
+            Log.e("Api", "Error fetching recent searches: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    suspend fun addRecentSearch(query: String): Flow<Response<Boolean>> = flow {
+        emit(Response.Loading())
+        try {
+            val userId = userSessionManager.userIdOrEmail()
+            if (userId.isBlank() || query.isBlank()) {
+                emit(Response.Success(false))
+                return@flow
+            }
+
+            networkApi.addRecentSearch(userId, AddSearchQueryRequest(query.trim()))
+            emit(Response.Success(true))
+        } catch (e: Exception) {
+            Log.e("Api", "Error adding recent search: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    suspend fun clearRecentSearches(): Flow<Response<Boolean>> = flow {
+        emit(Response.Loading())
+        try {
+            val userId = userSessionManager.userIdOrEmail()
+            if (userId.isBlank()) {
+                emit(Response.Success(false))
+                return@flow
+            }
+
+            networkApi.clearRecentSearches(userId)
+            emit(Response.Success(true))
+        } catch (e: Exception) {
+            Log.e("Api", "Error clearing recent searches: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    suspend fun removeRecentSearch(query: String): Flow<Response<Boolean>> = flow {
+        emit(Response.Loading())
+        try {
+            val userId = userSessionManager.userIdOrEmail()
+            if (userId.isBlank() || query.isBlank()) {
+                emit(Response.Success(false))
+                return@flow
+            }
+
+            networkApi.removeRecentSearch(userId, query)
+            emit(Response.Success(true))
+        } catch (e: Exception) {
+            Log.e("Api", "Error removing recent search: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
+    suspend fun getSearchAutocomplete(query: String, limit: Int = 6): Flow<Response<List<String>>> = flow {
+        emit(Response.Loading())
+        try {
+            if (query.isBlank()) {
+                emit(Response.Success(emptyList()))
+                return@flow
+            }
+
+            emit(Response.Success(parseStringListPayload(networkApi.getSearchAutocomplete(query, limit))))
+        } catch (e: Exception) {
+            Log.e("Api", "Error fetching search autocomplete: ${e.message}")
             emit(Response.Error(e.message ?: "Unknown error"))
         }
     }
@@ -870,9 +1078,7 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
     suspend fun getUserPlaylists(userId: String): Flow<Response<List<UserPlaylistModel>>> = flow {
         emit(Response.Loading())
         try {
-            val result = networkApi.getUserPlaylists(userId).map {
-                UserPlaylistModel(id = it.id, name = it.name, image = it.image, tracks = it.tracks)
-            }
+            val result = networkApi.getUserPlaylists(userId).map { it.toDomain() }
             emit(Response.Success(result))
         } catch (e: Exception) {
             Log.e("Api", "Error fetching user playlists: ${e.message}")
@@ -888,16 +1094,7 @@ class Api @Inject constructor(private val networkApi: NetworkApi) {
                 name = name,
                 body = CreatePlaylistRequest(image = image)
             )
-            emit(
-                Response.Success(
-                    UserPlaylistModel(
-                        id = result.id,
-                        name = result.name,
-                        image = result.image,
-                        tracks = result.tracks
-                    )
-                )
-            )
+            emit(Response.Success(parseCreatedPlaylist(result, name)))
         } catch (e: Exception) {
             Log.e("Api", "Error creating playlist: ${e.message}")
             emit(Response.Error(e.message ?: "Unknown error"))

@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.navigation.NavHostController
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.bumptech.glide.integration.compose.placeholder
@@ -55,7 +54,6 @@ import com.music.stream.neptune.R
 import com.music.stream.neptune.di.Palette
 import com.music.stream.neptune.di.PlaybackMediaType
 import com.music.stream.neptune.di.SongPlayer
-import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.components.pressScale
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.theme.GridBackground
@@ -86,7 +84,7 @@ fun Loader() {
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-fun MiniPlayer(navController: NavHostController) {
+fun MiniPlayer() {
     val miniPlayerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val songTitle = miniPlayerViewModel.currentSongTitle.value
     val songSinger = miniPlayerViewModel.currentSongSinger.value
@@ -174,9 +172,7 @@ fun MiniPlayer(navController: NavHostController) {
                     interactionSource = expandInteractionSource,
                     indication = null
                 ) {
-                    navController.navigate(Routes.Player.route) {
-                        launchSingleTop = true
-                    }
+                    miniPlayerViewModel.expandPlayer()
                 }
         ) {
             Row(

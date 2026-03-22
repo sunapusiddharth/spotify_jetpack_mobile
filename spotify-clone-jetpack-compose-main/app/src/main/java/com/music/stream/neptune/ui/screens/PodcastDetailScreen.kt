@@ -30,12 +30,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
@@ -100,8 +100,14 @@ fun PodcastDetailScreen(navController: NavController, podcastId: String?) {
     }
 
     val bgColor = Color(AppBackground.toArgb())
-    val scrollState = rememberSaveable(podcastId, saver = ScrollState.Saver) {
-        ScrollState(0)
+    val scrollKey = remember(podcastId) { "podcast_detail:$podcastId" }
+    val initialScroll = remember(scrollKey) { ScreenScrollMemory.scrollOffsets[scrollKey] ?: 0 }
+    val scrollState = rememberScrollState(initial = initialScroll)
+
+    DisposableEffect(scrollKey, scrollState) {
+        onDispose {
+            ScreenScrollMemory.scrollOffsets[scrollKey] = scrollState.value
+        }
     }
 
     Box(

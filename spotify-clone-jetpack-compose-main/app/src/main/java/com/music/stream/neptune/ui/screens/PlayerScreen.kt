@@ -90,7 +90,7 @@ import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-fun PlayerScreen(navController: NavController) {
+fun PlayerScreen(navController: NavController, onDismiss: (() -> Unit)? = null) {
     val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
     val songTitle = playerViewModel.currentSongTitle.value
     val songSinger = playerViewModel.currentSongSinger.value
@@ -178,7 +178,7 @@ fun PlayerScreen(navController: NavController) {
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            PlayerTopBar(navController)
+            PlayerTopBar(navController = navController, onDismiss = onDismiss)
 
             GlideImage(
                 modifier = Modifier
@@ -260,6 +260,7 @@ fun PlayerScreen(navController: NavController) {
                     showAlbumLink = mediaType == PlaybackMediaType.SONG && songAlbumId.isNotBlank(),
                     onAlbumClick = {
                         if (songAlbumId.isNotBlank()) {
+                            onDismiss?.invoke()
                             navController.navigate("${Routes.Album.route}/$songAlbumId")
                         }
                     },
@@ -709,7 +710,7 @@ fun QueueSheet(
 // ─── Top Bar ──────────────────────────────────────────────────────────────────
 
 @Composable
-fun PlayerTopBar(navController: NavController) {
+fun PlayerTopBar(navController: NavController, onDismiss: (() -> Unit)? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -719,7 +720,9 @@ fun PlayerTopBar(navController: NavController) {
             modifier = Modifier.clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
-            ) { navController.navigateUp() },
+            ) {
+                onDismiss?.invoke() ?: navController.navigateUp()
+            },
             painter = painterResource(id = R.drawable.ic_down),
             tint = Color.White,
             contentDescription = "Down"

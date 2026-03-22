@@ -17,23 +17,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,8 +54,15 @@ import androidx.navigation.NavController
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.music.stream.neptune.data.api.Response
-import com.music.stream.neptune.data.entity.AlbumsModel
-import com.music.stream.neptune.data.preferences.getAlbumsByIds
+import com.music.stream.neptune.data.entity.PodcastEpisodeModel
+import com.music.stream.neptune.data.entity.PodcastModel
+import com.music.stream.neptune.data.entity.RadioStationModel
+import com.music.stream.neptune.data.entity.SongsModel
+import com.music.stream.neptune.data.entity.UserHistoryEntityModel
+import com.music.stream.neptune.data.entity.UserHistoryPageModel
+import com.music.stream.neptune.data.entity.UserLikedEntityModel
+import com.music.stream.neptune.data.entity.UserLikesPageModel
+import com.music.stream.neptune.data.entity.UserPlaylistModel
 import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
@@ -85,21 +95,56 @@ fun LibraryScreen(navController: NavController) {
     ) { padding ->
         val libraryViewModel: HomeViewModel = hiltViewModel()
         val playerViewModel: PlayerViewModel = LocalSharedPlayerViewModel.current
-        val albums by libraryViewModel.albums.collectAsState()
-        val likedSongIds by playerViewModel.likedSongIds.collectAsState()
-        val likedAlbumIds by playerViewModel.likedAlbumIds.collectAsState()
+        val likesPage by libraryViewModel.libraryLikesPage.collectAsState()
+        val historyPage by libraryViewModel.libraryHistoryPage.collectAsState()
+        val playlistsState by libraryViewModel.libraryPlaylists.collectAsState()
+        val hasMoreLikes by libraryViewModel.hasMoreLibraryLikes.collectAsState()
+        val isLoadingMoreLikes by libraryViewModel.isLoadingMoreLibraryLikes.collectAsState()
+        val hasMoreHistory by libraryViewModel.hasMoreLibraryHistory.collectAsState()
+        val isLoadingMoreHistory by libraryViewModel.isLoadingMoreLibraryHistory.collectAsState()
+        val context = LocalContext.current
 
-        when (albums) {
-            is Response.Loading -> {
-                Log.d("LibraryScreen", "loading albums...")
+        LaunchedEffect(Unit) {
+            libraryViewModel.fetchLibraryContent(page = 1, limit = 20)
+        }
+
+        val likesResponse = (likesPage as? Response.Success)?.data
+        val historyResponse = (historyPage as? Response.Success)?.data
+        val playlistsResponse = (playlistsState as? Response.Success)?.data.orEmpty()
+        val hasContent = likesResponse?.items?.isNotEmpty() == true ||
+            historyResponse?.items?.isNotEmpty() == true ||
+            playlistsResponse.isNotEmpty()
+        val initialLoading = likesPage is Response.Loading &&
+            historyPage is Response.Loading &&
+            playlistsState is Response.Loading
+
+        when {
+            initialLoading -> {
+                Log.d("LibraryScreen", "loading library content...")
                 Loader()
             }
-            is Response.Success -> {
-                val albumsResponse = (albums as Response.Success).data
-                SumUpLibraryScreen(padding, albumsResponse, navController, likedSongIds, likedAlbumIds)
+            hasContent || likesPage is Response.Success || historyPage is Response.Success || playlistsState is Response.Success -> {
+                SumUpLibraryScreen(
+                    padding = padding,
+                    likesPage = likesResponse,
+                    historyPage = historyResponse,
+                    playlists = playlistsResponse,
+                    hasMoreLikes = hasMoreLikes,
+                    isLoadingMoreLikes = isLoadingMoreLikes,
+                    hasMoreHistory = hasMoreHistory,
+                    isLoadingMoreHistory = isLoadingMoreHistory,
+                    onLoadMoreLikes = { libraryViewModel.loadMoreLibraryLikes(limit = 20) },
+                    onLoadMoreHistory = { libraryViewModel.loadMoreLibraryHistory(limit = 20) },
+                    navController = navController,
+                    playerViewModel = playerViewModel,
+                    context = context
+                )
             }
-            is Response.Error -> {
-                Log.d("LibraryScreen", "Error loading albums")
+            else -> {
+                val error = (likesPage as? Response.Error)?.error
+                    ?: (historyPage as? Response.Error)?.error
+                    ?: (playlistsState as? Response.Error)?.error
+                Log.d("LibraryScreen", "Error loading library: $error")
                 Box(
                     Modifier.fillMaxSize().background(Color(AppBackground.toArgb())).padding(padding),
                     contentAlignment = Alignment.Center
@@ -107,7 +152,6 @@ fun LibraryScreen(navController: NavController) {
                     Text("Failed to load library", color = Color.White)
                 }
             }
-            else -> {}
         }
     }
 }
@@ -116,14 +160,30 @@ fun LibraryScreen(navController: NavController) {
 @Composable
 fun SumUpLibraryScreen(
     padding: PaddingValues,
-    albums: List<AlbumsModel>,
+    likesPage: UserLikesPageModel?,
+    historyPage: UserHistoryPageModel?,
+    playlists: List<UserPlaylistModel>,
+    hasMoreLikes: Boolean,
+    isLoadingMoreLikes: Boolean,
+    hasMoreHistory: Boolean,
+    isLoadingMoreHistory: Boolean,
+    onLoadMoreLikes: () -> Unit,
+    onLoadMoreHistory: () -> Unit,
     navController: NavController,
-    likedSongIds: Set<String>,
-    likedAlbumIds: Set<String>
+    playerViewModel: PlayerViewModel,
+    context: android.content.Context
 ) {
-    val libraryAlbums = getAlbumsByIds(likedAlbumIds, albums)
-    val scrollState = rememberSaveable(saver = ScrollState.Saver) {
-        ScrollState(0)
+    val historyEntries = historyPage?.items.orEmpty()
+    val likedEntries = likesPage?.items.orEmpty()
+    val initialScroll = remember {
+        ScreenScrollMemory.scrollOffsets[Routes.Library.route] ?: 0
+    }
+    val scrollState = rememberScrollState(initial = initialScroll)
+
+    DisposableEffect(scrollState) {
+        onDispose {
+            ScreenScrollMemory.scrollOffsets[Routes.Library.route] = scrollState.value
+        }
     }
 
     Column(
@@ -135,139 +195,121 @@ fun SumUpLibraryScreen(
     ) {
         Spacer(Modifier.height(8.dp))
 
-        // ── Pinned: Liked Songs ───────────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(Color(0xFF6A1B9A), Color(0xFF4A148C))
-                    )
-                )
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null
-                ) { navController.navigate("${Routes.Album.route}/liked_songs") }
-                .padding(16.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(60.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF9C27B0).copy(alpha = 0.5f))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Favorite,
-                        contentDescription = "Liked Songs",
-                        tint = Color.White,
-                        modifier = Modifier.size(30.dp)
-                    )
-                }
-                Column {
-                    Text(
-                        text = "Liked Songs",
-                        color = Color.White,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = if (likedSongIds.isEmpty()) "No songs liked yet"
-                        else "${likedSongIds.size} song${if (likedSongIds.size != 1) "s" else ""}",
-                        color = Color.White.copy(alpha = 0.75f),
-                        fontSize = 13.sp
-                    )
-                }
+        LibrarySectionHero(
+            icon = Icons.Default.LibraryMusic,
+            title = "Your Library",
+            subtitle = buildString {
+                append("${playlists.size} playlists")
+                append(" • ")
+                append("${historyPage?.total ?: historyEntries.size} history")
+                append(" • ")
+                append("${likesPage?.total ?: likedEntries.size} liked")
             }
-        }
+        )
 
-        Spacer(Modifier.height(24.dp))
-
-        // ── Saved Albums header ───────────────────────────────────────────
-        if (libraryAlbums.isNotEmpty()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "Saved Albums",
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${libraryAlbums.size}",
-                    color = Color.Gray,
-                    fontSize = 13.sp
-                )
-            }
+        if (playlists.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            LibrarySectionHeader(
+                title = "Playlists",
+                countText = playlists.size.toString()
+            )
             Spacer(Modifier.height(10.dp))
-        }
 
-        // ── Album rows ────────────────────────────────────────────────────
-        libraryAlbums.forEachIndexed { index, album ->
-            Row(
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFF161620))
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) { navController.navigate("${Routes.Album.route}/${album.id}") }
-                    .padding(10.dp)
-            ) {
-                GlideImage(
-                    modifier = Modifier
-                        .size(58.dp)
-                        .clip(RoundedCornerShape(6.dp)),
-                    model = album.image,
-                    contentScale = ContentScale.Crop,
-                    contentDescription = ""
+            playlists.forEach { playlist ->
+                LibraryEntityRow(
+                    image = "",
+                    title = playlist.name.ifBlank { "Playlist" },
+                    subtitle = if (playlist.tracks.isEmpty()) "Playlist" else "${playlist.tracks.size} tracks",
+                    icon = Icons.Default.LibraryMusic,
+                    onClick = { navController.navigate("${Routes.Playlist.route}/${playlist.id}") }
                 )
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = album.title,
-                        color = Color.White,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = album.artists.take(2).joinToString(", ") { it.name }
-                            .ifEmpty { "Album" },
-                        color = Color.Gray,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (album.songs.isNotEmpty()) {
-                        Text(
-                            text = "${album.songs.size} songs",
-                            color = Color(0xFF888888),
-                            fontSize = 11.sp
-                        )
-                    }
-                }
             }
         }
 
-        // ── Empty state ───────────────────────────────────────────────────
-        if (libraryAlbums.isEmpty()) {
+        if (historyEntries.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            LibrarySectionHeader(
+                title = "Recently Played",
+                countText = formatSectionCount(historyEntries.size, historyPage?.total ?: historyEntries.size, historyPage?.hasMore == true)
+            )
+            Spacer(Modifier.height(10.dp))
+
+            historyEntries.forEach { entry ->
+                LibraryEntityRow(
+                    image = entry.image,
+                    title = entry.title,
+                    subtitle = historySubtitle(entry),
+                    icon = Icons.Default.History,
+                    onClick = {
+                        when {
+                            entry.isSong -> playerViewModel.playSongFromHistory(entry, historyEntries, context)
+                            entry.isRadioStation -> playerViewModel.playRadioFromHistory(entry, context)
+                            entry.isPodcastEpisode -> playerViewModel.playPodcastEpisodeFromHistory(entry, context)
+                            entry.isPlaylist -> navController.navigate("${Routes.Playlist.route}/${entry.entityId}")
+                            entry.isPlaylistCollection -> navController.navigate("${Routes.Playlist.route}/${entry.entityId}")
+                        }
+                    }
+                )
+            }
+
+            if (hasMoreHistory || isLoadingMoreHistory) {
+                LibraryLoadMoreRow(
+                    isLoading = isLoadingMoreHistory,
+                    onClick = onLoadMoreHistory
+                )
+            }
+        }
+
+        if (likedEntries.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            LibrarySectionHeader(
+                title = "Liked",
+                countText = formatSectionCount(likedEntries.size, likesPage?.total ?: likedEntries.size, likesPage?.hasMore == true)
+            )
+            Spacer(Modifier.height(10.dp))
+
+            likedEntries.forEach { entry ->
+                LibraryEntityRow(
+                    image = entry.image,
+                    title = entry.title,
+                    subtitle = likedSubtitle(entry),
+                    icon = Icons.Default.Favorite,
+                    onClick = {
+                        when {
+                            entry.isSong && entry.s3link.isNotBlank() -> playerViewModel.playSongQueueFromPlaylist(
+                                queueSongs = listOf(entry.toSongModel()),
+                                startIndex = 0,
+                                album = entry.subtitle.ifBlank { "Liked" },
+                                context = context
+                            )
+                            entry.isRadioStation && entry.s3link.isNotBlank() -> playerViewModel.startRadioPlayback(
+                                queue = listOf(entry.toRadioStationModel()),
+                                startIndex = 0,
+                                context = context
+                            )
+                            entry.isPodcastEpisode && entry.s3link.isNotBlank() -> playerViewModel.startPodcastPlayback(
+                                podcast = entry.toPodcastModel(),
+                                queue = listOf(entry.toPodcastEpisodeModel()),
+                                startIndex = 0,
+                                context = context
+                            )
+                            entry.isAlbum -> navController.navigate("${Routes.Album.route}/${entry.entityId}")
+                            entry.isPlaylist -> navController.navigate("${Routes.Playlist.route}/${entry.entityId}")
+                            entry.isPlaylistCollection -> navController.navigate("${Routes.Playlist.route}/${entry.entityId}")
+                        }
+                    }
+                )
+            }
+
+            if (hasMoreLikes || isLoadingMoreLikes) {
+                LibraryLoadMoreRow(
+                    isLoading = isLoadingMoreLikes,
+                    onClick = onLoadMoreLikes
+                )
+            }
+        }
+
+        if (playlists.isEmpty() && historyEntries.isEmpty() && likedEntries.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -282,13 +324,13 @@ fun SumUpLibraryScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "No saved albums yet",
+                        text = "Your library is empty",
                         color = Color.White,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium
                     )
                     Text(
-                        text = "Browse albums and tap the save icon",
+                        text = "Likes, history, and playlists will appear here",
                         color = Color.Gray,
                         fontSize = 13.sp
                     )
@@ -299,3 +341,209 @@ fun SumUpLibraryScreen(
         Spacer(modifier = Modifier.height(130.dp))
     }
 }
+
+@Composable
+private fun LibraryLoadMoreRow(
+    isLoading: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        OutlinedButton(onClick = onClick, enabled = !isLoading) {
+            Text(
+                text = if (isLoading) "Loading..." else "Load More",
+                color = Color.White
+            )
+        }
+    }
+}
+
+@Composable
+private fun LibrarySectionHero(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(Color(0xFF203A43), Color(0xFF2C5364))
+                )
+            )
+            .padding(16.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White.copy(alpha = 0.12f))
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = Color.White,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
+            Column {
+                Text(text = title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text(text = subtitle, color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibrarySectionHeader(title: String, countText: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        Text(text = countText, color = Color.Gray, fontSize = 13.sp)
+    }
+}
+
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+private fun LibraryEntityRow(
+    image: String,
+    title: String,
+    subtitle: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    Row(
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFF161620))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { onClick() }
+            .padding(10.dp)
+    ) {
+        if (image.isNotBlank()) {
+            GlideImage(
+                modifier = Modifier
+                    .size(58.dp)
+                    .clip(RoundedCornerShape(6.dp)),
+                model = image,
+                contentScale = ContentScale.Crop,
+                contentDescription = title
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(58.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0xFF262638)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(imageVector = icon, contentDescription = title, tint = Color.White)
+            }
+        }
+
+        Spacer(Modifier.width(12.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title.ifBlank { "Untitled" },
+                color = Color.White,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = subtitle.ifBlank { "Library item" },
+                color = Color.Gray,
+                fontSize = 12.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+private fun historySubtitle(entry: UserHistoryEntityModel): String = when {
+    entry.isSong -> entry.artists.joinToString(", ") { it.title }.ifBlank { entry.album.title.ifBlank { entry.subtitle.ifBlank { "Song" } } }
+    entry.isRadioStation -> "Radio station"
+    entry.isPodcastEpisode -> entry.subtitle.ifBlank { "Podcast episode" }
+    entry.isPlaylist -> "Playlist"
+    entry.isPlaylistCollection -> "Playlist"
+    else -> entry.subtitle.ifBlank { entry.entityType }
+}
+
+private fun likedSubtitle(entry: UserLikedEntityModel): String = when {
+    entry.isSong -> entry.artists.joinToString(", ") { it.title }.ifBlank { entry.album.title.ifBlank { entry.subtitle.ifBlank { "Song" } } }
+    entry.isRadioStation -> "Radio station"
+    entry.isPodcastEpisode -> entry.subtitle.ifBlank { "Podcast episode" }
+    entry.isAlbum -> "Album"
+    entry.isPlaylist -> "Playlist"
+    entry.isPlaylistCollection -> "Playlist"
+    else -> entry.subtitle.ifBlank { entry.entityType }
+}
+
+private fun formatSectionCount(visibleCount: Int, total: Int, hasMore: Boolean): String {
+    return when {
+        total <= 0 -> visibleCount.toString()
+        hasMore && visibleCount < total -> "$visibleCount/$total"
+        else -> total.toString()
+    }
+}
+
+private val UserLikedEntityModel.isSong: Boolean get() = entityType == "song"
+private val UserLikedEntityModel.isRadioStation: Boolean get() = entityType == "radio_station"
+private val UserLikedEntityModel.isPodcastEpisode: Boolean get() = entityType == "podcast_episode"
+private val UserLikedEntityModel.isAlbum: Boolean get() = entityType == "album"
+private val UserLikedEntityModel.isPlaylist: Boolean get() = entityType == "playlist"
+private val UserLikedEntityModel.isPlaylistCollection: Boolean get() = entityType == "playlist_collection"
+
+private fun UserLikedEntityModel.toSongModel(): SongsModel = SongsModel(
+    id = entityId,
+    name = title,
+    artists = artists,
+    album = album.copy(title = album.title.ifBlank { subtitle }),
+    thumbnail = image,
+    s3link = s3link
+)
+
+private fun UserLikedEntityModel.toRadioStationModel(): RadioStationModel = RadioStationModel(
+    id = entityId,
+    name = title,
+    stream_url = s3link,
+    image = image,
+    favicon = image
+)
+
+private fun UserLikedEntityModel.toPodcastModel(): PodcastModel = PodcastModel(
+    id = entityId,
+    title = subtitle.ifBlank { title },
+    image = image,
+    author = subtitle
+)
+
+private fun UserLikedEntityModel.toPodcastEpisodeModel(): PodcastEpisodeModel = PodcastEpisodeModel(
+    id = entityId,
+    title = title,
+    s3link = s3link,
+    thumbnail = image,
+    episode_number = episodeNumber ?: 0
+)

@@ -41,6 +41,12 @@ fun WebPlayListType.toDomain(): AlbumsModel = AlbumsModel(
     songs = songs.map { it.toDomain() }
 )
 
+fun WebFreshAlbumType.toDomain(): AlbumsModel = AlbumsModel(
+    id = id,
+    image = image,
+    title = title
+)
+
 fun WebAllPlayListType.toDomain(): AlbumsModel = AlbumsModel(
     id = id,
     image = image,
@@ -55,6 +61,12 @@ fun WebArtistType.toDomain(): ArtistsModel = ArtistsModel(
     monthly_listeners = monthly_listeners,
     popular_songs = popular_songs.map { it.toDomain() },
     genres = genres
+)
+
+fun WebArtistListingType.toDomain(): ArtistsModel = ArtistsModel(
+    id = id,
+    title = title,
+    image = image
 )
 
 fun WebCardContentType.toDomain(): HomePageCardModel = HomePageCardModel(
@@ -128,15 +140,15 @@ fun WebSearchPageResType.toDomain(): SearchResultModel = SearchResultModel(
 fun WebUserType.toDomain(): UserModel = UserModel(
     id = id,
     name = name,
-    playlists = playlists.map {
-        UserPlaylistModel(
-            id = it.id,
-            name = it.name,
-            image = it.image,
-            tracks = it.tracks
-        )
-    },
+    playlists = playlists.map { it.toDomain() },
     likedSongs = liked_songs,
     tracks = tracks,
     artists = artists
+)
+
+fun WebUserPlayListType.toDomain(): UserPlaylistModel = UserPlaylistModel(
+    id = id,
+    name = name,
+    image = image,
+    tracks = tracks
 )

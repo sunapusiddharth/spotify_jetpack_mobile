@@ -37,12 +37,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -102,14 +102,25 @@ fun HomeScreen(navController: NavController) {
     val homePage by homeViewModel.homePage.collectAsState()
     val isLoadingNextHomePage by homeViewModel.isLoadingNextHomePage.collectAsState()
     val hasMoreHomePages by homeViewModel.hasMoreHomePages.collectAsState()
-    val artists by homeViewModel.artists.collectAsState()
     val topStations by homeViewModel.topStations.collectAsState()
-    val topScoringSongs by homeViewModel.topScoringSongs.collectAsState()
     val topPodcasts by homeViewModel.topPodcasts.collectAsState()
     val historyEntries by homeViewModel.historyEntries.collectAsState()
 
-    val listState = rememberSaveable(saver = LazyListState.Saver) {
-        LazyListState()
+    val initialListPosition = remember {
+        ScreenScrollMemory.lazyListPositions[Routes.Home.route] ?: SavedLazyListPosition()
+    }
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialListPosition.index,
+        initialFirstVisibleItemScrollOffset = initialListPosition.offset
+    )
+
+    DisposableEffect(listState) {
+        onDispose {
+            ScreenScrollMemory.lazyListPositions[Routes.Home.route] = SavedLazyListPosition(
+                index = listState.firstVisibleItemIndex,
+                offset = listState.firstVisibleItemScrollOffset
+            )
+        }
     }
 
     Surface(
@@ -119,9 +130,7 @@ fun HomeScreen(navController: NavController) {
             .statusBarsPadding()
     ) {
         val homeSections = (homePage as? Response.Success)?.data?.results.orEmpty()
-        val artistsResponse = (artists as? Response.Success)?.data.orEmpty()
         val stationsResponse = (topStations as? Response.Success)?.data.orEmpty()
-        val topSongsResponse = (topScoringSongs as? Response.Success)?.data.orEmpty()
         val podcastsResponse = (topPodcasts as? Response.Success)?.data.orEmpty()
         val historyResponse = (historyEntries as? Response.Success)?.data.orEmpty()
         val shouldLoadMore by remember(listState, hasMoreHomePages, isLoadingNextHomePage, homeSections) {
@@ -143,16 +152,12 @@ fun HomeScreen(navController: NavController) {
         }
 
         val isLoading = homePage is Response.Loading &&
-            artists is Response.Loading &&
             topStations is Response.Loading &&
-            topScoringSongs is Response.Loading &&
             topPodcasts is Response.Loading
 
         val hasAnyContent = homeSections.isNotEmpty() ||
             historyResponse.isNotEmpty() ||
-            artistsResponse.isNotEmpty() ||
             stationsResponse.isNotEmpty() ||
-            topSongsResponse.isNotEmpty() ||
             podcastsResponse.isNotEmpty()
 
         when {
@@ -167,18 +172,14 @@ fun HomeScreen(navController: NavController) {
                     listState = listState,
                     historyEntries = historyResponse,
                     homeSections = homeSections,
-                    artists = artistsResponse,
                     topStations = stationsResponse,
-                    topScoringSongs = topSongsResponse,
                     topPodcasts = podcastsResponse,
                     isLoadingNextHomePage = isLoadingNextHomePage
                 )
             }
             else -> {
                 val error = (homePage as? Response.Error)?.error
-                    ?: (artists as? Response.Error)?.error
                     ?: (topStations as? Response.Error)?.error
-                    ?: (topScoringSongs as? Response.Error)?.error
                     ?: (topPodcasts as? Response.Error)?.error
                 Log.d("homeMain", "Error!! $error")
                 Box(
@@ -199,9 +200,7 @@ fun SumUpHomeScreen(
     listState: androidx.compose.foundation.lazy.LazyListState,
     historyEntries: List<UserHistoryEntityModel>,
     homeSections: List<HomePageSectionModel>,
-    artists: List<ArtistsModel>,
     topStations: List<RadioStationModel>,
-    topScoringSongs: List<SongsModel>,
     topPodcasts: List<PodcastModel>,
     isLoadingNextHomePage: Boolean
 ) {
@@ -213,15 +212,9 @@ fun SumUpHomeScreen(
             .background(Color(AppBackground.toArgb())),
         state = listState
     ) {
-        item {
-            StaggeredReveal(index = 0) {
-                HomeArtists(artists = artists, navController)
-            }
-        }
-
         if (historyEntries.isNotEmpty()) {
             item(key = "history_entries") {
-                StaggeredReveal(index = 1) {
+                StaggeredReveal(index = 0) {
                     HomeHistorySection(
                         navController = navController,
                         playerViewModel = playerViewModel,
@@ -232,7 +225,7 @@ fun SumUpHomeScreen(
         }
 
         item {
-            StaggeredReveal(index = 2) {
+            StaggeredReveal(index = 1) {
                 HomePodcastsSection(navController = navController, podcasts = topPodcasts)
             }
         }
@@ -242,20 +235,14 @@ fun SumUpHomeScreen(
             key = { index -> "home_section_${homeSectionUiKey(displaySections[index])}" }
         ) { index ->
             val section = displaySections[index]
-            val revealIndex = 3 + index
+            val revealIndex = 2 + index
             StaggeredReveal(index = revealIndex) {
                 HomeCardSection(navController = navController, section = section, playerViewModel = playerViewModel)
             }
         }
 
         item {
-            StaggeredReveal(index = 13) {
-                HomeSongsSection(title = "Top Tracks For You", songs = topScoringSongs, playerViewModel = playerViewModel)
-            }
-        }
-
-        item {
-            StaggeredReveal(index = 14) {
+            StaggeredReveal(index = 12) {
                 HomeStationsSection(navController = navController, stations = topStations)
             }
         }

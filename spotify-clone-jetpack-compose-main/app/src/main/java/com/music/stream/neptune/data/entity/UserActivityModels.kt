@@ -18,6 +18,8 @@ data class UserLikedEntityModel(
     val image: String = "",
     val s3link: String = "",
     val subtitle: String = "",
+    val artists: List<SongsModel.ArtistRef> = emptyList(),
+    val album: SongsModel.AlbumRef = SongsModel.AlbumRef(),
     val episodeNumber: Int? = null,
     val likedAt: String = ""
 )
@@ -29,6 +31,8 @@ data class UserHistoryEntityModel(
     val image: String = "",
     val s3link: String = "",
     val subtitle: String = "",
+    val artists: List<SongsModel.ArtistRef> = emptyList(),
+    val album: SongsModel.AlbumRef = SongsModel.AlbumRef(),
     val episodeNumber: Int? = null,
     val watchedDuration: Int = 0,
     val totalDuration: Int = 0,
@@ -46,7 +50,8 @@ data class UserHistoryEntityModel(
 fun UserHistoryEntityModel.toSongModel(): SongsModel = SongsModel(
     id = entityId,
     name = title,
-    album = SongsModel.AlbumRef(title = subtitle),
+    artists = artists,
+    album = album.copy(title = album.title.ifBlank { subtitle }),
     thumbnail = image,
     duration = totalDuration,
     s3link = s3link

@@ -31,9 +31,12 @@ class AppRepository @Inject constructor(private val api: Api) {
     suspend fun provideAlbumById(id: String) = api.getAlbumById(id)
     suspend fun provideArtistById(id: String) = api.getArtistById(id)
     suspend fun provideArtistSongs(id: String, page: Int) = api.getArtistSongs(id, page)
-    suspend fun provideSearch(query: String, type: String, page: Int) = api.searchAll(query, type, page)
-    suspend fun provideTopScoringSongs(limit: Int) = api.getTopScoringSongs(limit)
-    suspend fun provideTopScoringSongsForUser(userId: String, limit: Int) = api.getTopScoringSongsForUser(userId, limit)
+    suspend fun provideSearch(query: String, type: String?, page: Int) = api.searchAll(query, type, page)
+    suspend fun provideRecentSearches() = api.getRecentSearches()
+    suspend fun provideAddRecentSearch(query: String) = api.addRecentSearch(query)
+    suspend fun provideClearRecentSearches() = api.clearRecentSearches()
+    suspend fun provideRemoveRecentSearch(query: String) = api.removeRecentSearch(query)
+    suspend fun provideSearchAutocomplete(query: String, limit: Int = 6) = api.getSearchAutocomplete(query, limit)
 
     suspend fun provideRequestTrackAddition(userId: String, songId: String) = api.requestTrackAddition(userId, songId)
     suspend fun provideLikeDislikeSong(userId: String, likeDislike: Boolean, song: com.music.stream.neptune.data.entity.SongsModel) =

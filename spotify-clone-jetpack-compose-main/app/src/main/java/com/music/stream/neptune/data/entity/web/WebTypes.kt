@@ -2,6 +2,8 @@ package com.music.stream.neptune.data.entity.web
 
 // Mirrors sidflix-music-web-3-main/types/*.ts contracts.
 
+import com.google.gson.annotations.SerializedName
+
 data class WebArtistType(
     val image: String = "",
     val image_type: String = "",
@@ -23,7 +25,16 @@ data class WebArtistType(
 data class WebArtistListingType(
     val image: String = "",
     val id: String = "",
+    @SerializedName(value = "title", alternate = ["name"])
     val title: String = ""
+)
+
+data class WebFreshAlbumType(
+    val id: String = "",
+    val image: String = "",
+    val title: String = "",
+    val release_date: String = "",
+    val total_tracks: Int = 0
 )
 
 data class WebAllPlayListType(
@@ -153,12 +164,14 @@ data class WebSongType(
 )
 
 data class WebSongArtistRef(
+    @SerializedName(value = "title", alternate = ["name"])
     val title: String = "",
     val id: String = "",
     val path: String = ""
 )
 
 data class WebSongAlbumRef(
+    @SerializedName(value = "title", alternate = ["name"])
     val title: String = "",
     val id: String = "",
     val path: String = ""

@@ -1,0 +1,3946 @@
+{
+    "openapi": "3.0.0",
+    "paths": {
+        "/album/freshAlbums": {
+            "get": {
+                "operationId": "AlbumController_freshAlbums",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/FreshAlbumResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Albums"
+                ]
+            }
+        },
+        "/album/{id}": {
+            "get": {
+                "operationId": "AlbumController_getAlbum",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PlayListResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Albums"
+                ]
+            },
+            "delete": {
+                "operationId": "AlbumController_deleteAlbum",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Albums"
+                ]
+            }
+        },
+        "/album/all/{page}": {
+            "get": {
+                "operationId": "AlbumController_getAllArtists",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ArtistPaginationType"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Albums"
+                ]
+            }
+        },
+        "/artist/top": {
+            "get": {
+                "operationId": "ArtistController_getTopArtists",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ArtistListingResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Artists"
+                ]
+            }
+        },
+        "/artist/{id}": {
+            "get": {
+                "operationId": "ArtistController_getArtist",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ArtistResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Artists"
+                ]
+            }
+        },
+        "/artist/{id}/albums/{skip}/{limit}": {
+            "get": {
+                "operationId": "ArtistController_fetchAllArtistAlbums",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "skip",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/PlayListResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Artists"
+                ]
+            }
+        },
+        "/artist/{id}/playlists_collection/{skip}/{limit}": {
+            "get": {
+                "operationId": "ArtistController_fetchAllArtistPlaylistsCollection",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "skip",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/PlayListResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Artists"
+                ]
+            }
+        },
+        "/artist/all/{page}": {
+            "get": {
+                "operationId": "ArtistController_getAllArtists",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ArtistListingResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Artists"
+                ]
+            }
+        },
+        "/artist/songs/{id}/{page}": {
+            "get": {
+                "operationId": "ArtistController_getArtistSongs",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ArtistSongsPaginationType"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Artists"
+                ]
+            }
+        },
+        "/bulkupload/untagged": {
+            "get": {
+                "operationId": "BulkUploadController_getUntaggedTracks",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/bulkupload/tag": {
+            "post": {
+                "operationId": "BulkUploadController_tagTrack",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/bulkupload/batch-tag": {
+            "post": {
+                "operationId": "BulkUploadController_batchTagTracks",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/bulkupload/bulk-tag": {
+            "post": {
+                "operationId": "BulkUploadController_bulkTagTracks",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/bulkupload/track/{id}": {
+            "get": {
+                "operationId": "BulkUploadController_getTrackById",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            },
+            "delete": {
+                "operationId": "BulkUploadController_deleteBulkUploadTrack",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/bulkupload/status/{status}": {
+            "get": {
+                "operationId": "BulkUploadController_getTracksByStatus",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/bulkupload/track/{id}/status": {
+            "patch": {
+                "operationId": "BulkUploadController_updateTrackStatus",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/bulkupload/stats": {
+            "get": {
+                "operationId": "BulkUploadController_getStats",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/bulkupload/populate_playlist_data/{id}": {
+            "post": {
+                "operationId": "BulkUploadController_parsePlaylistData",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/bulkupload/playlist/{playlistId}/songs-with-matches": {
+            "get": {
+                "operationId": "BulkUploadController_getSongsWithMatchesFromPlaylist",
+                "parameters": [
+                    {
+                        "name": "playlistId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/bulkupload/tag-song": {
+            "post": {
+                "operationId": "BulkUploadController_tagSongWithFile",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/tracks/{id}": {
+            "get": {
+                "operationId": "SongsController_getSong",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            },
+            "delete": {
+                "operationId": "SongsController_deleteSong",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/tracks/index_song/{songid}": {
+            "post": {
+                "operationId": "SongsController_indexSong",
+                "parameters": [
+                    {
+                        "name": "songid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/tracks/index_all_songs": {
+            "post": {
+                "operationId": "SongsController_indexallSongs",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/tracks/indexAllRadioStations/{limit}": {
+            "post": {
+                "operationId": "SongsController_indexAllRadioStations",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/tracks/indexRadioStations": {
+            "post": {
+                "operationId": "SongsController_indexRadioStations",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/tracks/indexAllPlaylistCollections/{limit}": {
+            "post": {
+                "operationId": "SongsController_indexAllPlaylistCollections",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/tracks/reindexAllPodcasts/{limit}/{offset}": {
+            "post": {
+                "operationId": "SongsController_reindexAllPodcasts",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/tracks/{id}/addS3Link/{s3link}": {
+            "post": {
+                "operationId": "SongsController_addS3Link",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "s3link",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/tracks/findbyname/{userid}": {
+            "post": {
+                "operationId": "SongsController_findSongsByName",
+                "parameters": [
+                    {
+                        "name": "userid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/tracks/findmultiplebynames/{userid}": {
+            "post": {
+                "operationId": "SongsController_findSongsByFileNames",
+                "parameters": [
+                    {
+                        "name": "userid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/tracks/findmultiplebyids/{userid}": {
+            "post": {
+                "operationId": "SongsController_findSongsByIds",
+                "parameters": [
+                    {
+                        "name": "userid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/tracks/requestSpotifysearch/{userid}": {
+            "post": {
+                "operationId": "SongsController_requestSpotifysearch",
+                "parameters": [
+                    {
+                        "name": "userid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/tracks/requestTrackAddition/{userid}/{songid}": {
+            "post": {
+                "operationId": "SongsController_requestTrackAddition",
+                "parameters": [
+                    {
+                        "name": "userid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "songid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/users/{id}": {
+            "get": {
+                "operationId": "UserController_getProfile",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            },
+            "delete": {
+                "operationId": "UserController_deleteUser",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/users": {
+            "post": {
+                "operationId": "UserController_createser",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/users/{id}/home/{page}": {
+            "get": {
+                "operationId": "UserController_getUserHomePage",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/HomePageDataResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/users/{userId}/likes/{entityId}": {
+            "post": {
+                "operationId": "UserController_likeEntity",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "entityId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/LikeEntityDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserActionResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            },
+            "delete": {
+                "operationId": "UserController_unlikeEntity",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "entityId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserActionResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/users/{userId}/likes": {
+            "get": {
+                "operationId": "UserController_getUserLikes",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated liked entities",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedLikedEntityResponseDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/users/{userId}/likes/{entityId}/check": {
+            "get": {
+                "operationId": "UserController_checkIfLiked",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "entityId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CheckLikedResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/users/{userId}/likes/reset": {
+            "delete": {
+                "operationId": "UserController_resetLikes",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/users/{userId}/history/{entityId}": {
+            "put": {
+                "operationId": "UserController_updateHistory",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "entityId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdateHistoryDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserActionResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            },
+            "get": {
+                "operationId": "UserController_getEntityHistory",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "entityId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "type",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HistoryEntityResponseDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            },
+            "delete": {
+                "operationId": "UserController_resetEntityHistory",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "entityId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "type",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserActionResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/users/{userId}/history": {
+            "get": {
+                "operationId": "UserController_getUserHistory",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated history",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedHistoryEntityResponseDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/users/{userId}/history/reset": {
+            "delete": {
+                "operationId": "UserController_resetHistory",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UserActionResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Users"
+                ]
+            }
+        },
+        "/playlist/{id}": {
+            "get": {
+                "operationId": "PlayListController_getPlayList",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PlayListResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "PlayList"
+                ]
+            }
+        },
+        "/playlist/{user_id}/{id}": {
+            "delete": {
+                "operationId": "PlayListController_deletePlayList",
+                "parameters": [
+                    {
+                        "name": "user_id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "PlayList"
+                ]
+            }
+        },
+        "/playlist/{id}/playlists": {
+            "get": {
+                "operationId": "PlayListController_getUserPlayLists",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "PlayList"
+                ]
+            }
+        },
+        "/playlist/{id}/create-new-playlist/{name}": {
+            "post": {
+                "operationId": "PlayListController_createPlayList",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "name",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "PlayList"
+                ]
+            }
+        },
+        "/playlist/{userid}/{songid}": {
+            "put": {
+                "operationId": "PlayListController_addSongtoPlaylists",
+                "parameters": [
+                    {
+                        "name": "userid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "songid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "PlayList"
+                ]
+            }
+        },
+        "/playlist/uploadImage": {
+            "post": {
+                "operationId": "PlayListController_uploadFile",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "PlayList"
+                ]
+            }
+        },
+        "/stream/addStatus": {
+            "post": {
+                "operationId": "TrackController_addSongUploadStatus",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/stream/get_key/{filename}": {
+            "get": {
+                "operationId": "TrackController_getKeyForFileName",
+                "parameters": [
+                    {
+                        "name": "filename",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/stream/all_available_songs/{skip}/{limit}": {
+            "get": {
+                "operationId": "TrackController_get_all_available_songs",
+                "parameters": [
+                    {
+                        "name": "skip",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AllSongsPagination"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/stream/markbadlink/{id}/{bad}": {
+            "post": {
+                "operationId": "TrackController_markbadlink",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "bad",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/stream/upload-status/{songId}": {
+            "get": {
+                "operationId": "TrackController_getUploadStatus",
+                "parameters": [
+                    {
+                        "name": "songId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/stream/uploadAll/{id}": {
+            "post": {
+                "operationId": "TrackController_uploadFile",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Tracks"
+                ]
+            }
+        },
+        "/playlist_collection/{id}": {
+            "get": {
+                "operationId": "PlayListCollectionController_getPlayListCollection",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PlayListResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "PlayListCollection"
+                ]
+            }
+        },
+        "/playlist_collection/browse/{page}": {
+            "get": {
+                "operationId": "PlayListCollectionController_getPLaylistCollections",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HomePageInfo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "PlayListCollection"
+                ]
+            }
+        },
+        "/playlist_collection/{id}/meta": {
+            "patch": {
+                "operationId": "PlayListCollectionController_updatePlaylistCollectionMeta",
+                "summary": "Update playlist collection metadata (name/image)",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "description": "Playlist collection ID (pid)",
+                        "example": "pl_abc123",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UpdatePlaylistCollectionMetaDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Playlist metadata updated successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UpdatePlaylistCollectionMetaResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body"
+                    },
+                    "404": {
+                        "description": "Playlist collection not found"
+                    }
+                },
+                "tags": [
+                    "PlayListCollection"
+                ]
+            }
+        },
+        "/playlist_collection/{id}/tracks": {
+            "delete": {
+                "operationId": "PlayListCollectionController_deleteTracksFromPlaylistCollection",
+                "summary": "Remove tracks from playlist collection",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "description": "Playlist collection ID (pid)",
+                        "example": "pl_abc123",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeleteTracksFromPlaylistDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Tracks removed successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/TrackOperationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body"
+                    },
+                    "404": {
+                        "description": "Playlist collection not found"
+                    }
+                },
+                "tags": [
+                    "PlayListCollection"
+                ]
+            }
+        },
+        "/radio/all_countries": {
+            "get": {
+                "operationId": "RadioController_getCountries",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/RadioCOuntriesType"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Radio"
+                ]
+            }
+        },
+        "/radio/{id}": {
+            "get": {
+                "operationId": "RadioController_getRadio",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RadioStationType"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Radio"
+                ]
+            }
+        },
+        "/radio/{userid}/liked_stations": {
+            "get": {
+                "operationId": "RadioController_getUserLikedStations",
+                "parameters": [
+                    {
+                        "name": "userid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/RadioStationType"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Radio"
+                ]
+            }
+        },
+        "/radio/{countryCode}/getTop10StationsByGenres/{genre}": {
+            "get": {
+                "operationId": "RadioController_getTop10StationsByGenres",
+                "parameters": [
+                    {
+                        "name": "countryCode",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "genre",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/RadioStationType"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Radio"
+                ]
+            }
+        },
+        "/radio/{countryCode}/browseStationsByCountryAndGenre/{page}": {
+            "get": {
+                "operationId": "RadioController_browseStationsByCountryAndGenre",
+                "parameters": [
+                    {
+                        "name": "countryCode",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "genre",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RadioStationsPageInfo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Radio"
+                ]
+            }
+        },
+        "/radio/{countryCode}/browseStationsByCountry/{page}": {
+            "get": {
+                "operationId": "RadioController_browseStationsByCountry",
+                "parameters": [
+                    {
+                        "name": "countryCode",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RadioStationsPageInfo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Radio"
+                ]
+            }
+        },
+        "/radio/all_genres/{countryCode}": {
+            "get": {
+                "operationId": "RadioController_getAllGenres",
+                "parameters": [
+                    {
+                        "name": "countryCode",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "Radio"
+                ]
+            }
+        },
+        "/podcast/getTop10PodcastsByGenres/{genre}": {
+            "get": {
+                "operationId": "PodcastController_getTop10PodcastsByGenres",
+                "parameters": [
+                    {
+                        "name": "genre",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/PodcastCardDto"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "POdcast"
+                ]
+            }
+        },
+        "/podcast/browsePodcastsByGenre/{genre}/{page}": {
+            "get": {
+                "operationId": "PodcastController_browsePodcastsByGenre",
+                "parameters": [
+                    {
+                        "name": "genre",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PodcastsPageInfo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "POdcast"
+                ]
+            }
+        },
+        "/podcast/browse/{page}": {
+            "get": {
+                "operationId": "PodcastController_browsePodcasts",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PodcastsPageInfo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "POdcast"
+                ]
+            }
+        },
+        "/podcast/all_genres": {
+            "get": {
+                "operationId": "PodcastController_getAllGenres",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/GenresType"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "POdcast"
+                ]
+            }
+        },
+        "/podcast/{id}": {
+            "get": {
+                "operationId": "PodcastController_getPodcastDetails",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PodcastCardDto"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "POdcast"
+                ]
+            }
+        },
+        "/podcast/{id}/episodes/{page}": {
+            "get": {
+                "operationId": "PodcastController_getPodcastEpisoes",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PodcastsEpisodesPageInfo"
+                                }
+                            }
+                        }
+                    }
+                },
+                "tags": [
+                    "POdcast"
+                ]
+            }
+        },
+        "/podcast/requestPodcastEpisodesPopulation/{userid}/{id}": {
+            "post": {
+                "operationId": "PodcastController_requestTrackAddition",
+                "parameters": [
+                    {
+                        "name": "userid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "POdcast"
+                ]
+            }
+        },
+        "/data_population/updateTopArtists": {
+            "get": {
+                "operationId": "DataPopulationController_updateTopArtists",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Data Population"
+                ]
+            }
+        },
+        "/data_population/playlist-import-logs/{playlistId}": {
+            "get": {
+                "operationId": "DataPopulationController_playlistImportLogs",
+                "parameters": [
+                    {
+                        "name": "playlistId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Data Population"
+                ]
+            }
+        },
+        "/data_population/importPlaylist": {
+            "post": {
+                "operationId": "DataPopulationController_importPlaylistWithDeezer",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Data Population"
+                ]
+            }
+        },
+        "/data_population/sendVKMusicRequest": {
+            "post": {
+                "operationId": "DataPopulationController_sendVKMusicRequestForSong",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Data Population"
+                ]
+            }
+        },
+        "/search/{userid}/{query}/{page}": {
+            "get": {
+                "operationId": "SearchController_searchAll",
+                "parameters": [
+                    {
+                        "name": "userid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "query",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "type",
+                        "required": false,
+                        "in": "query",
+                        "description": "Optional filter by entity type",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Search"
+                ]
+            }
+        },
+        "/search/{userid}/{query}/{genre}/{page}/{countryCode}": {
+            "get": {
+                "operationId": "SearchController_searchRadio",
+                "parameters": [
+                    {
+                        "name": "userid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "query",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "genre",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "countryCode",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Search"
+                ]
+            }
+        },
+        "/search/{userid}/{countryCode}/radio_genres": {
+            "get": {
+                "operationId": "SearchController_radioGenres",
+                "parameters": [
+                    {
+                        "name": "userid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "countryCode",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Search"
+                ]
+            }
+        },
+        "/search/{userid}/plc_genres": {
+            "get": {
+                "operationId": "SearchController_plcGenres",
+                "parameters": [
+                    {
+                        "name": "userid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Search"
+                ]
+            }
+        },
+        "/search/{userId}/recent": {
+            "get": {
+                "operationId": "SearchController_getRecentSearches",
+                "summary": "Get all recent searches for a user",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Recent searches retrieved successfully"
+                    }
+                },
+                "tags": [
+                    "Search"
+                ]
+            },
+            "post": {
+                "operationId": "SearchController_addRecentSearch",
+                "summary": "Add a search query to recent searches",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AddSearchQueryDto"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Search added successfully"
+                    }
+                },
+                "tags": [
+                    "Search"
+                ]
+            },
+            "delete": {
+                "operationId": "SearchController_clearAllRecentSearches",
+                "summary": "Clear all recent searches for a user",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "All searches cleared successfully"
+                    }
+                },
+                "tags": [
+                    "Search"
+                ]
+            }
+        },
+        "/search/{userId}/recent/{query}": {
+            "delete": {
+                "operationId": "SearchController_removeRecentSearch",
+                "summary": "Remove a specific search query",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "query",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Search removed successfully"
+                    }
+                },
+                "tags": [
+                    "Search"
+                ]
+            }
+        },
+        "/search/autocomplete": {
+            "get": {
+                "operationId": "SearchController_autocomplete",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Search"
+                ]
+            }
+        },
+        "/search/clearDocumentsByType/{type}": {
+            "delete": {
+                "operationId": "SearchController_deleteByType",
+                "parameters": [
+                    {
+                        "name": "type",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Search"
+                ]
+            }
+        },
+        "/search/stats": {
+            "get": {
+                "operationId": "SearchController_getStats",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "Search"
+                ]
+            }
+        },
+        "/podcast_migration/sqlite/count": {
+            "get": {
+                "operationId": "PodcastMigrationController_getSqlitePodcastCount",
+                "summary": "Get total count of eligible podcasts in SQLite",
+                "parameters": [
+                    {
+                        "name": "dbPath",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Count retrieved successfully"
+                    }
+                },
+                "tags": [
+                    "Podcast Migration"
+                ]
+            }
+        },
+        "/podcast_migration/sqlite/import": {
+            "post": {
+                "operationId": "PodcastMigrationController_importPodcastsFromSqlite",
+                "summary": "Import podcasts from SQLite to PostgreSQL",
+                "parameters": [
+                    {
+                        "name": "dbPath",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "batchSize",
+                        "required": false,
+                        "in": "query",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "required": false,
+                        "in": "query",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Import completed"
+                    }
+                },
+                "tags": [
+                    "Podcast Migration"
+                ]
+            }
+        },
+        "/podcast_migration/sqlite/import-all": {
+            "post": {
+                "operationId": "PodcastMigrationController_importAllPodcastsFromSqlite",
+                "summary": "Import all podcasts from SQLite (auto-batching)",
+                "parameters": [
+                    {
+                        "name": "dbPath",
+                        "required": true,
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "batchSize",
+                        "required": false,
+                        "in": "query",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Import completed"
+                    }
+                },
+                "tags": [
+                    "Podcast Migration"
+                ]
+            }
+        },
+        "/podcast_migration/episodes/download/{podcastUuid}": {
+            "post": {
+                "operationId": "PodcastMigrationController_downloadPodcastEpisodes",
+                "summary": "Download episodes for a specific podcast",
+                "parameters": [
+                    {
+                        "name": "podcastUuid",
+                        "required": true,
+                        "in": "path",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "maxRetries",
+                        "required": false,
+                        "in": "query",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "timeout",
+                        "required": false,
+                        "in": "query",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Episodes downloaded"
+                    }
+                },
+                "tags": [
+                    "Podcast Migration"
+                ]
+            }
+        },
+        "/podcast_migration/episodes/batch-download": {
+            "post": {
+                "operationId": "PodcastMigrationController_batchDownloadEpisodes",
+                "summary": "Batch download episodes for pending podcasts",
+                "parameters": [
+                    {
+                        "name": "batchSize",
+                        "required": false,
+                        "in": "query",
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "maxRetries",
+                        "required": false,
+                        "in": "query",
+                        "schema": {
+                            "type": "number"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Batch download completed"
+                    }
+                },
+                "tags": [
+                    "Podcast Migration"
+                ]
+            }
+        },
+        "/podcast_migration/episodes/stats": {
+            "get": {
+                "operationId": "PodcastMigrationController_getEpisodeDownloadStats",
+                "summary": "Get episode download tracker statistics",
+                "parameters": [],
+                "responses": {
+                    "200": {
+                        "description": "Statistics retrieved"
+                    }
+                },
+                "tags": [
+                    "Podcast Migration"
+                ]
+            }
+        },
+        "/one_time_sync_local/import/spotify": {
+            "post": {
+                "operationId": "OneTImeSyncLocalController_startImport",
+                "parameters": [],
+                "responses": {
+                    "201": {
+                        "description": ""
+                    }
+                },
+                "tags": [
+                    "one time lcoal sync"
+                ]
+            }
+        }
+    },
+    "info": {
+        "title": "Spotify content  service ",
+        "description": "The Spotify service API description",
+        "version": "1.0",
+        "contact": {}
+    },
+    "tags": [
+        {
+            "name": "spotify-content-service",
+            "description": ""
+        }
+    ],
+    "servers": [],
+    "components": {
+        "schemas": {
+            "FreshAlbumResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "image": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "release_date": {
+                        "type": "string"
+                    },
+                    "total_tracks": {
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "id",
+                    "image",
+                    "title",
+                    "release_date",
+                    "total_tracks"
+                ]
+            },
+            "ArtistListingResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id"
+                ]
+            },
+            "SongResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "playlist_id": {
+                        "type": "string"
+                    },
+                    "playlist_name": {
+                        "type": "string"
+                    },
+                    "artists": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ArtistListingResponse"
+                        }
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "genres": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "album": {
+                        "type": "object"
+                    },
+                    "thumbnail": {
+                        "type": "string"
+                    },
+                    "s3link": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "playlist_id",
+                    "playlist_name",
+                    "artists",
+                    "duration",
+                    "genres",
+                    "album",
+                    "thumbnail",
+                    "s3link"
+                ]
+            },
+            "PlayListResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "image": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "songs": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SongResponse"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "image",
+                    "title",
+                    "songs"
+                ]
+            },
+            "AllPlayListResponse": {
+                "type": "object",
+                "properties": {
+                    "image": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "image",
+                    "id",
+                    "title"
+                ]
+            },
+            "ArtistPaginationType": {
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AllPlayListResponse"
+                        }
+                    },
+                    "page": {
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "results",
+                    "page"
+                ]
+            },
+            "CardContentResponse": {
+                "type": "object",
+                "properties": {
+                    "image": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "subtitle": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "path": {
+                        "type": "string"
+                    },
+                    "song": {
+                        "$ref": "#/components/schemas/SongResponse"
+                    }
+                },
+                "required": [
+                    "image",
+                    "id",
+                    "title",
+                    "subtitle",
+                    "type",
+                    "path",
+                    "song"
+                ]
+            },
+            "HomePageDataResponse": {
+                "type": "object",
+                "properties": {
+                    "cardType": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "path": {
+                        "type": "string"
+                    },
+                    "cards": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CardContentResponse"
+                        }
+                    },
+                    "id": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "cardType",
+                    "label",
+                    "path",
+                    "cards",
+                    "id"
+                ]
+            },
+            "ArtistResponse": {
+                "type": "object",
+                "properties": {
+                    "image": {
+                        "type": "string"
+                    },
+                    "image_type": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "monthly_listeners": {
+                        "type": "number"
+                    },
+                    "popular_songs": {
+                        "type": "array",
+                        "items": {
+                            "type": "array"
+                        }
+                    },
+                    "featured_albums": {
+                        "$ref": "#/components/schemas/HomePageDataResponse"
+                    },
+                    "popular_releases": {
+                        "$ref": "#/components/schemas/HomePageDataResponse"
+                    },
+                    "singles": {
+                        "$ref": "#/components/schemas/HomePageDataResponse"
+                    },
+                    "albums_featuring_artist": {
+                        "$ref": "#/components/schemas/HomePageDataResponse"
+                    },
+                    "fans_also_like": {
+                        "$ref": "#/components/schemas/HomePageDataResponse"
+                    },
+                    "appears_on": {
+                        "$ref": "#/components/schemas/HomePageDataResponse"
+                    },
+                    "dicovered_on": {
+                        "$ref": "#/components/schemas/HomePageDataResponse"
+                    },
+                    "genres": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "similar": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ArtistListingResponse"
+                        }
+                    }
+                },
+                "required": [
+                    "image",
+                    "image_type",
+                    "id",
+                    "title",
+                    "monthly_listeners",
+                    "popular_songs",
+                    "featured_albums",
+                    "popular_releases",
+                    "singles",
+                    "albums_featuring_artist",
+                    "fans_also_like",
+                    "appears_on",
+                    "dicovered_on",
+                    "genres",
+                    "similar"
+                ]
+            },
+            "ArtistSongsPaginationType": {
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SongResponse"
+                        }
+                    },
+                    "page": {
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "results",
+                    "page"
+                ]
+            },
+            "UserPlayListResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name"
+                ]
+            },
+            "UserResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "playlists": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UserPlayListResponse"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "playlists"
+                ]
+            },
+            "LikeEntityDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "UserActionResponse": {
+                "type": "object",
+                "properties": {
+                    "success": {
+                        "type": "boolean"
+                    },
+                    "userId": {
+                        "type": "string"
+                    },
+                    "entityId": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "success",
+                    "userId",
+                    "entityId"
+                ]
+            },
+            "LikedEntityResponseDto": {
+                "type": "object",
+                "properties": {
+                    "entityId": {
+                        "type": "string"
+                    },
+                    "entityType": {
+                        "type": "string"
+                    },
+                    "image": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "s3link": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "albumName": {
+                        "type": "string"
+                    },
+                    "podcastName": {
+                        "type": "string"
+                    },
+                    "episodeNumber": {
+                        "type": "number"
+                    },
+                    "likedAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "entityId",
+                    "entityType",
+                    "image",
+                    "title",
+                    "s3link",
+                    "likedAt"
+                ]
+            },
+            "PaginatedLikedEntityResponseDto": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/LikedEntityResponseDto"
+                        }
+                    },
+                    "total": {
+                        "type": "number"
+                    },
+                    "page": {
+                        "type": "number"
+                    },
+                    "limit": {
+                        "type": "number"
+                    },
+                    "hasMore": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "items",
+                    "total",
+                    "page",
+                    "limit",
+                    "hasMore"
+                ]
+            },
+            "CheckLikedResponse": {
+                "type": "object",
+                "properties": {
+                    "userId": {
+                        "type": "string"
+                    },
+                    "entityId": {
+                        "type": "string"
+                    },
+                    "liked": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "userId",
+                    "entityId",
+                    "liked"
+                ]
+            },
+            "UpdateHistoryDto": {
+                "type": "object",
+                "properties": {}
+            },
+            "HistoryEntityResponseDto": {
+                "type": "object",
+                "properties": {
+                    "entityId": {
+                        "type": "string"
+                    },
+                    "entityType": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "image": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "s3link": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "watchedDuration": {
+                        "type": "number"
+                    },
+                    "totalDuration": {
+                        "type": "number"
+                    },
+                    "watchedPercentage": {
+                        "type": "number"
+                    },
+                    "lastPlayedAt": {
+                        "format": "date-time",
+                        "type": "string"
+                    },
+                    "albumName": {
+                        "type": "string"
+                    },
+                    "podcastName": {
+                        "type": "string"
+                    },
+                    "episodeNumber": {
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "entityId",
+                    "entityType",
+                    "title",
+                    "image",
+                    "s3link",
+                    "watchedDuration",
+                    "totalDuration",
+                    "watchedPercentage",
+                    "lastPlayedAt"
+                ]
+            },
+            "PaginatedHistoryEntityResponseDto": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/HistoryEntityResponseDto"
+                        }
+                    },
+                    "total": {
+                        "type": "number"
+                    },
+                    "page": {
+                        "type": "number"
+                    },
+                    "limit": {
+                        "type": "number"
+                    },
+                    "hasMore": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "items",
+                    "total",
+                    "page",
+                    "limit",
+                    "hasMore"
+                ]
+            },
+            "AllSongsPagination": {
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/SongResponse"
+                        }
+                    },
+                    "page": {
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "results",
+                    "page"
+                ]
+            },
+            "HomePageInfo": {
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/HomePageDataResponse"
+                        }
+                    },
+                    "page": {
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "results",
+                    "page"
+                ]
+            },
+            "UpdatePlaylistCollectionMetaDto": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "New playlist name",
+                        "example": "My Updated Playlist"
+                    },
+                    "image": {
+                        "type": "string",
+                        "description": "New playlist image URL",
+                        "example": "https://example.com/image.jpg"
+                    }
+                }
+            },
+            "UpdatePlaylistCollectionMetaResponse": {
+                "type": "object",
+                "properties": {
+                    "pid": {
+                        "type": "string",
+                        "description": "Playlist ID",
+                        "example": "pl_abc123"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Updated playlist name",
+                        "example": "My Updated Playlist"
+                    },
+                    "image": {
+                        "type": "string",
+                        "description": "Updated image URL",
+                        "example": "https://example.com/image.jpg"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Success message"
+                    }
+                },
+                "required": [
+                    "pid",
+                    "name",
+                    "message"
+                ]
+            },
+            "DeleteTracksFromPlaylistDto": {
+                "type": "object",
+                "properties": {
+                    "trackIds": {
+                        "description": "Array of song IDs to remove",
+                        "example": [
+                            "spotify:track:1",
+                            "spotify:track:2"
+                        ],
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "trackIds"
+                ]
+            },
+            "TrackOperationResponse": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "number",
+                        "description": "Number of tracks affected",
+                        "example": 2
+                    },
+                    "playlistId": {
+                        "type": "string",
+                        "description": "Playlist ID",
+                        "example": "pl_abc123"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Success message"
+                    }
+                },
+                "required": [
+                    "count",
+                    "playlistId",
+                    "message"
+                ]
+            },
+            "RadioCOuntriesType": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "count": {
+                        "type": "number"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "count",
+                    "name"
+                ]
+            },
+            "RadioStationType": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string"
+                    },
+                    "id": {
+                        "type": "string"
+                    },
+                    "clickCount": {
+                        "type": "number"
+                    },
+                    "countryCode": {
+                        "type": "string"
+                    },
+                    "favicon": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "created_at": {
+                        "format": "date-time",
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "url",
+                    "id",
+                    "clickCount",
+                    "countryCode",
+                    "favicon",
+                    "name",
+                    "tags",
+                    "created_at"
+                ]
+            },
+            "RadioStationsEntity": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Station unique ID",
+                        "example": "abc-123"
+                    },
+                    "click_count": {
+                        "type": "number",
+                        "description": "Click count",
+                        "example": 1500
+                    },
+                    "country_code": {
+                        "type": "string",
+                        "description": "Country code",
+                        "example": "US"
+                    },
+                    "favicon": {
+                        "type": "string",
+                        "description": "Favicon URL",
+                        "example": "https://example.com/icon.png"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Station name",
+                        "example": "BBC Radio 1"
+                    },
+                    "tags": {
+                        "description": "Tags",
+                        "example": [
+                            "news",
+                            "music"
+                        ],
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "Stream URL",
+                        "example": "https://stream.example.com/live"
+                    },
+                    "created_at": {
+                        "format": "date-time",
+                        "type": "string",
+                        "description": "Created timestamp"
+                    }
+                },
+                "required": [
+                    "id",
+                    "click_count",
+                    "country_code",
+                    "favicon",
+                    "name",
+                    "tags",
+                    "url",
+                    "created_at"
+                ]
+            },
+            "RadioStationsPageInfo": {
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/RadioStationsEntity"
+                        }
+                    },
+                    "page": {
+                        "type": "number"
+                    },
+                    "total": {
+                        "type": "number"
+                    },
+                    "hasMore": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "results",
+                    "page",
+                    "total",
+                    "hasMore"
+                ]
+            },
+            "PodcastCardDto": {
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "url": {
+                        "type": "string"
+                    },
+                    "title": {
+                        "type": "string"
+                    },
+                    "link": {
+                        "type": "string"
+                    },
+                    "itunes_id": {
+                        "type": "number"
+                    },
+                    "itunes_author": {
+                        "type": "string"
+                    },
+                    "image_url": {
+                        "type": "string"
+                    },
+                    "language": {
+                        "type": "string"
+                    },
+                    "episode_count": {
+                        "type": "number"
+                    },
+                    "popularity_score": {
+                        "type": "number"
+                    },
+                    "newest_enclosure_url": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "category": {
+                        "type": "string"
+                    },
+                    "newest_enclosure_duration": {
+                        "type": "number"
+                    },
+                    "genres": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "uuid",
+                    "url",
+                    "title",
+                    "link",
+                    "itunes_id",
+                    "itunes_author",
+                    "image_url",
+                    "language",
+                    "episode_count",
+                    "popularity_score",
+                    "newest_enclosure_url",
+                    "description",
+                    "category",
+                    "newest_enclosure_duration",
+                    "genres"
+                ]
+            },
+            "PodcastsPageInfo": {
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PodcastCardDto"
+                        }
+                    },
+                    "page": {
+                        "type": "number"
+                    },
+                    "total": {
+                        "type": "number"
+                    },
+                    "hasMore": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "results",
+                    "page",
+                    "total",
+                    "hasMore"
+                ]
+            },
+            "GenresType": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": "string"
+                    },
+                    "count": {
+                        "type": "number"
+                    }
+                },
+                "required": [
+                    "value",
+                    "count"
+                ]
+            },
+            "PodcastEpisodeDto": {
+                "type": "object",
+                "properties": {
+                    "uuid": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "audio_url": {
+                        "type": "string"
+                    },
+                    "image_url": {
+                        "type": "string"
+                    },
+                    "subtitle": {
+                        "type": "string"
+                    },
+                    "video_url": {
+                        "type": "string"
+                    },
+                    "file_type": {
+                        "type": "string"
+                    },
+                    "duration": {
+                        "type": "number"
+                    },
+                    "episode_type": {
+                        "type": "string"
+                    },
+                    "episode_number": {
+                        "type": "number"
+                    },
+                    "season_number": {
+                        "type": "number"
+                    },
+                    "date_published": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "uuid",
+                    "name",
+                    "description",
+                    "audio_url",
+                    "image_url",
+                    "subtitle",
+                    "video_url",
+                    "file_type",
+                    "duration",
+                    "episode_type",
+                    "episode_number",
+                    "season_number",
+                    "date_published"
+                ]
+            },
+            "PodcastsEpisodesPageInfo": {
+                "type": "object",
+                "properties": {
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PodcastEpisodeDto"
+                        }
+                    },
+                    "page": {
+                        "type": "number"
+                    },
+                    "total": {
+                        "type": "number"
+                    },
+                    "hasMore": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "results",
+                    "page",
+                    "total",
+                    "hasMore"
+                ]
+            },
+            "AddSearchQueryDto": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query string",
+                        "example": "The Weeknd"
+                    }
+                },
+                "required": [
+                    "query"
+                ]
+            }
+        }
+    }
+}

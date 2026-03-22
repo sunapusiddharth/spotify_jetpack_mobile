@@ -31,12 +31,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -157,8 +157,14 @@ fun SumUpAlbumScreen(
     val isCurrentAlbumPlaying = playerViewModel.mediaType.value == PlaybackMediaType.SONG &&
         playerViewModel.currentSongPlayingState.value &&
         playerViewModel.currentSongAlbumTitle.value == album.title
-    val scrollState = rememberSaveable(album.id, saver = ScrollState.Saver) {
-        ScrollState(0)
+    val scrollKey = remember(album.id) { "album:${album.id}" }
+    val initialScroll = remember(scrollKey) { ScreenScrollMemory.scrollOffsets[scrollKey] ?: 0 }
+    val scrollState = rememberScrollState(initial = initialScroll)
+
+    DisposableEffect(scrollKey, scrollState) {
+        onDispose {
+            ScreenScrollMemory.scrollOffsets[scrollKey] = scrollState.value
+        }
     }
 
     val totalDurationMs = albumSongs.sumOf { it.duration }

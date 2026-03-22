@@ -47,6 +47,7 @@ import com.music.stream.neptune.data.entity.SongsModel
 import com.music.stream.neptune.ui.components.UnavailableAudioBadge
 import com.music.stream.neptune.ui.components.Loader
 import com.music.stream.neptune.ui.components.unavailableArtworkColorFilter
+import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.theme.AppBackground
 import com.music.stream.neptune.ui.viewmodel.HomeViewModel
 import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
@@ -60,9 +61,25 @@ fun AvailableTracksScreen() {
     val bgColor = Color(AppBackground.toArgb())
     val availableSongsPage by homeViewModel.availableSongsPage.collectAsState()
     val context = LocalContext.current
+    val initialListPosition = remember {
+        ScreenScrollMemory.lazyListPositions[Routes.AvailableTracks.route] ?: SavedLazyListPosition()
+    }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState(
+        initialFirstVisibleItemIndex = initialListPosition.index,
+        initialFirstVisibleItemScrollOffset = initialListPosition.offset
+    )
+
+    androidx.compose.runtime.DisposableEffect(listState) {
+        onDispose {
+            ScreenScrollMemory.lazyListPositions[Routes.AvailableTracks.route] = SavedLazyListPosition(
+                index = listState.firstVisibleItemIndex,
+                offset = listState.firstVisibleItemScrollOffset
+            )
+        }
+    }
 
     LaunchedEffect(Unit) {
-        homeViewModel.fetchAvailableSongs(skip = 0, limit = 100)
+        homeViewModel.fetchAvailableSongs(skip = 0, limit = 50)
     }
 
     Scaffold(
@@ -121,7 +138,8 @@ fun AvailableTracksScreen() {
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(padding)
-                            .background(bgColor)
+                            .background(bgColor),
+                        state = listState
                     ) {
                         item {
                             Spacer(Modifier.height(8.dp))

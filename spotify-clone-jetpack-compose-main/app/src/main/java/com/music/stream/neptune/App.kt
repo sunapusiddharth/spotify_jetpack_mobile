@@ -2,6 +2,13 @@ package com.music.stream.neptune
 
 import android.annotation.SuppressLint
 import androidx.activity.ComponentActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
@@ -25,6 +32,7 @@ import com.music.stream.neptune.ui.navigation.MyNavHost
 import com.music.stream.neptune.ui.navigation.Routes
 import com.music.stream.neptune.ui.screens.AuthLoadingScreen
 import com.music.stream.neptune.ui.screens.AuthLoginScreen
+import com.music.stream.neptune.ui.screens.PlayerScreen
 import com.music.stream.neptune.ui.viewmodel.AuthViewModel
 import com.music.stream.neptune.ui.viewmodel.LocalSharedPlayerViewModel
 import com.music.stream.neptune.ui.viewmodel.PlayerViewModel
@@ -60,6 +68,7 @@ fun App() {
     val bottomBarPlayerState = rememberSaveable { (mutableStateOf(true)) }
     val navController = rememberNavController()
     val playerViewModel: PlayerViewModel = hiltViewModel()
+    val isPlayerExpanded by playerViewModel.isPlayerExpanded.collectAsState()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
@@ -108,22 +117,36 @@ fun App() {
         }
 
         ) {
-            Scaffold(
-                modifier = Modifier.navigationBarsPadding(),
-                bottomBar = {
-                    MainBottomNavigation(
-                        navController = navController,
+            Box(modifier = Modifier.fillMaxSize()) {
+                Scaffold(
+                    modifier = Modifier.navigationBarsPadding(),
+                    bottomBar = {
+                        MainBottomNavigation(
+                            navController = navController,
+                            bottomBarState = bottomBarState,
+                            bottomBarPlayerState = bottomBarPlayerState,
+                            playerOverlayVisible = isPlayerExpanded,
+                            onMenuClick = { coroutineScope.launch { drawerState.open() } }
+                        )
+                    }
+                ) {
+                    MyNavHost(
+                        navHostController = navController,
                         bottomBarState = bottomBarState,
-                        bottomBarPlayerState = bottomBarPlayerState,
-                        onMenuClick = { coroutineScope.launch { drawerState.open() } }
+                        bottomBarPlayerState = bottomBarPlayerState
                     )
                 }
-            ) {
-                MyNavHost(
-                    navHostController = navController,
-                    bottomBarState = bottomBarState,
-                    bottomBarPlayerState = bottomBarPlayerState
-                )
+
+                AnimatedVisibility(
+                    visible = isPlayerExpanded,
+                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                ) {
+                    PlayerScreen(
+                        navController = navController,
+                        onDismiss = { playerViewModel.collapsePlayer() }
+                    )
+                }
             }
         }
     }

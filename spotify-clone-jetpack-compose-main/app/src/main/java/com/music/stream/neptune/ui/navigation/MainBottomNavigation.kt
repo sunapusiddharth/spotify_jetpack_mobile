@@ -49,6 +49,7 @@ fun MainBottomNavigation(
     navController: NavHostController,
     bottomBarState: MutableState<Boolean>,
     bottomBarPlayerState: MutableState<Boolean>,
+    playerOverlayVisible: Boolean,
     onMenuClick: () -> Unit = {}
 ) {
 
@@ -80,7 +81,7 @@ fun MainBottomNavigation(
                         visible = bottomBarPlayerState.value,
                         enter = slideInVertically(initialOffsetY = { it }),
                         exit = slideOutVertically(targetOffsetY = { it }),
-                        content = { MiniPlayer(navController) }
+                        content = { MiniPlayer() }
                     )
 
                     NavigationBar(
@@ -96,6 +97,7 @@ fun MainBottomNavigation(
                         navItems.forEach { item ->
                             NavigationBarItem(
                                 selected = currentRoute == item.route,
+                                enabled = !playerOverlayVisible,
                                 icon = {
                                     when (item) {
                                         Routes.Radio -> Icon(
@@ -135,6 +137,7 @@ fun MainBottomNavigation(
                         // Menu item — opens the sidebar drawer
                         NavigationBarItem(
                             selected = false,
+                            enabled = !playerOverlayVisible,
                             icon = {
                                 Icon(
                                     imageVector = Icons.Default.Menu,

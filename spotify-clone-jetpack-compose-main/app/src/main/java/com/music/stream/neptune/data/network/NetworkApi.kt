@@ -4,11 +4,13 @@ import com.music.stream.neptune.data.entity.PodcastEpisodeModel
 import com.music.stream.neptune.data.entity.PodcastModel
 import com.music.stream.neptune.data.entity.RadioStationModel
 import com.music.stream.neptune.data.entity.SongsModel
+import com.music.stream.neptune.data.entity.web.WebArtistListingType
 import com.music.stream.neptune.data.entity.web.WebArtistType
+import com.music.stream.neptune.data.entity.web.WebAllPlayListType
+import com.music.stream.neptune.data.entity.web.WebFreshAlbumType
 import com.music.stream.neptune.data.entity.web.WebHomePageDataType
 import com.music.stream.neptune.data.entity.web.WebMeiliSearchAggType
 import com.music.stream.neptune.data.entity.web.WebPlayListType
-import com.music.stream.neptune.data.entity.web.WebAllPlayListType
 import com.music.stream.neptune.data.entity.web.WebPodcastCardDto
 import com.music.stream.neptune.data.entity.web.WebPodcastsByGenrePageInfo
 import com.music.stream.neptune.data.entity.web.WebPodcastEpisodesPageInfo
@@ -16,11 +18,11 @@ import com.music.stream.neptune.data.entity.web.WebPodcastsPageInfo
 import com.music.stream.neptune.data.entity.web.WebRadioCountryAgg
 import com.music.stream.neptune.data.entity.web.WebRadioStation
 import com.music.stream.neptune.data.entity.web.WebRadioStationsPageInfo
-import com.music.stream.neptune.data.entity.web.WebSearchPageResType
 import com.music.stream.neptune.data.entity.web.WebSongType
 import com.music.stream.neptune.data.entity.web.WebUserType
 import com.music.stream.neptune.data.entity.web.WebUserPlayListType
-import com.google.gson.JsonObject
+import com.google.gson.JsonElement
+import com.google.gson.annotations.SerializedName
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -38,11 +40,11 @@ interface NetworkApi {
     suspend fun getHomePage(
         @Path("id") userId: String,
         @Path("page") page: Int
-    ): JsonObject
+    ): JsonElement
 
     // Album endpoints
     @GET("album/freshAlbums")
-    suspend fun getFreshAlbums(): List<WebPlayListType>
+    suspend fun getFreshAlbums(): List<WebFreshAlbumType>
 
     @GET("album/all/{page}")
     suspend fun getAllAlbums(@Path("page") page: Int): WebAllPlayListPageResponse
@@ -52,7 +54,7 @@ interface NetworkApi {
 
     // Artist endpoints
     @GET("artist/top")
-    suspend fun getTopArtists(): List<WebArtistType>
+    suspend fun getTopArtists(): List<WebArtistListingType>
 
     @GET("artist/{id}")
     suspend fun getArtistById(@Path("id") id: String): WebArtistType
@@ -64,15 +66,6 @@ interface NetworkApi {
     ): WebArtistSongsPaginationResponse
 
     // Track / song endpoints
-    @GET("tracks/top_scoring_songs/{limit}")
-    suspend fun getTopScoringSongs(@Path("limit") limit: Int): List<WebSongType>
-
-    @GET("tracks/top_scoring_songs/{userid}/{limit}")
-    suspend fun getTopScoringSongsForUser(
-        @Path("userid") userId: String,
-        @Path("limit") limit: Int
-    ): List<WebSongType>
-
     @POST("tracks/requestTrackAddition/{userid}/{songid}")
     suspend fun requestTrackAddition(
         @Path("userid") userId: String,
@@ -120,12 +113,41 @@ interface NetworkApi {
     ): WebSongsPageResponse
 
     // Search endpoint
-    @GET("search/test/{query}/{type}/{page}")
+    @GET("search/{userid}/{query}/{page}")
     suspend fun searchAll(
+        @Path("userid") userId: String,
         @Path("query") query: String,
-        @Path("type") type: String,
-        @Path("page") page: Int
-    ): WebSearchPageResType
+        @Path("page") page: Int,
+        @Query("type") type: String?
+    ): JsonElement
+
+    @GET("search/{userId}/recent")
+    suspend fun getRecentSearches(
+        @Path("userId") userId: String
+    ): JsonElement
+
+    @POST("search/{userId}/recent")
+    suspend fun addRecentSearch(
+        @Path("userId") userId: String,
+        @Body body: AddSearchQueryRequest
+    ): ApiStatusResponse
+
+    @DELETE("search/{userId}/recent")
+    suspend fun clearRecentSearches(
+        @Path("userId") userId: String
+    ): ApiStatusResponse
+
+    @DELETE("search/{userId}/recent/{query}")
+    suspend fun removeRecentSearch(
+        @Path("userId") userId: String,
+        @Path("query") query: String
+    ): ApiStatusResponse
+
+    @GET("search/autocomplete")
+    suspend fun getSearchAutocomplete(
+        @Query("q") query: String,
+        @Query("limit") limit: Int
+    ): JsonElement
 
     // Podcast endpoints
     @GET("podcast/browse/{page}")
@@ -146,10 +168,10 @@ interface NetworkApi {
         @Path("page") page: Int
     ): WebPodcastEpisodesPageInfo
 
-    @POST("podcast/requestPodcastEpisodesPopulation/{userid}/{songid}")
+    @POST("podcast/requestPodcastEpisodesPopulation/{userid}/{id}")
     suspend fun requestPodcastEpisodesPopulation(
         @Path("userid") userId: String,
-        @Path("songid") podcastId: String
+        @Path("id") podcastId: String
     ): ApiStatusResponse
 
     @GET("podcast/all_genres")
@@ -162,15 +184,15 @@ interface NetworkApi {
     @GET("radio/all_genres/{country}")
     suspend fun getRadioGenres(@Path("country") country: String): List<WebMeiliSearchAggType>
 
-    @GET("radio/{country}/browseStationsByCountry/{page}")
+    @GET("radio/{countryCode}/browseStationsByCountry/{page}")
     suspend fun browseStations(
-        @Path("country") country: String,
+        @Path("countryCode") country: String,
         @Path("page") page: Int
     ): WebRadioStationsPageInfo
 
-    @GET("radio/{country}/browseStationsByCountryAndGenre/{page}")
+    @GET("radio/{countryCode}/browseStationsByCountryAndGenre/{page}")
     suspend fun browseStationsByCountryAndGenre(
-        @Path("country") country: String,
+        @Path("countryCode") country: String,
         @Path("page") page: Int,
         @Query("genre") genre: String
     ): WebRadioStationsPageInfo
@@ -182,15 +204,15 @@ interface NetworkApi {
     @GET("playlist_collection/{id}")
     suspend fun getPlaylistCollectionById(@Path("id") id: String): WebPlayListType
 
-    @GET("playlist/{userid}/playlists")
-    suspend fun getUserPlaylists(@Path("userid") userId: String): List<WebUserPlayListType>
+    @GET("playlist/{id}/playlists")
+    suspend fun getUserPlaylists(@Path("id") userId: String): List<WebUserPlayListType>
 
-    @POST("playlist/{userid}/create-new-playlist/{name}")
+    @POST("playlist/{id}/create-new-playlist/{name}")
     suspend fun createNewPlaylist(
-        @Path("userid") userId: String,
+        @Path("id") userId: String,
         @Path("name") name: String,
         @Body body: CreatePlaylistRequest
-    ): WebUserPlayListType
+    ): JsonElement
 
     @PUT("playlist/{userid}/{songid}")
     suspend fun addSongToPlaylist(
@@ -250,6 +272,8 @@ data class LikedEntityResponseDto(
     val title: String = "",
     val s3link: String? = null,
     val albumName: String? = null,
+    val album: ActivityAlbumDto? = null,
+    val artists: List<ActivityArtistDto> = emptyList(),
     val podcastName: String? = null,
     val episodeNumber: Int? = null,
     val likedAt: String = ""
@@ -266,8 +290,24 @@ data class HistoryEntityResponseDto(
     val watchedPercentage: Int = 0,
     val lastPlayedAt: String = "",
     val albumName: String? = null,
+    val album: ActivityAlbumDto? = null,
+    val artists: List<ActivityArtistDto> = emptyList(),
     val podcastName: String? = null,
     val episodeNumber: Int? = null
+)
+
+data class ActivityArtistDto(
+    @SerializedName(value = "title", alternate = ["name"])
+    val title: String = "",
+    val id: String = "",
+    val path: String = ""
+)
+
+data class ActivityAlbumDto(
+    @SerializedName(value = "title", alternate = ["name"])
+    val title: String = "",
+    val id: String = "",
+    val path: String = ""
 )
 
 data class RequestTrackAdditionResponse(
@@ -284,6 +324,10 @@ data class AddSongToPlaylistRequest(
 
 data class CreatePlaylistRequest(
     val image: String = ""
+)
+
+data class AddSearchQueryRequest(
+    val query: String
 )
 
 data class WebArtistSongsPaginationResponse(

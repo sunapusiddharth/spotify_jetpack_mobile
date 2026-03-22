@@ -29,11 +29,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,8 +71,13 @@ fun PodcastScreen(navController: NavController) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
     val bgColor = Color(AppBackground.toArgb())
-    val scrollState = rememberSaveable(saver = ScrollState.Saver) {
-        ScrollState(0)
+    val initialScroll = remember { ScreenScrollMemory.scrollOffsets[Routes.Podcast.route] ?: 0 }
+    val scrollState = rememberScrollState(initial = initialScroll)
+
+    DisposableEffect(scrollState) {
+        onDispose {
+            ScreenScrollMemory.scrollOffsets[Routes.Podcast.route] = scrollState.value
+        }
     }
 
     Scaffold(

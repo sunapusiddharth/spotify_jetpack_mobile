@@ -37,12 +37,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,8 +88,14 @@ fun RadioScreen(@Suppress("UNUSED_PARAMETER") navController: NavController) {
 
     var selectedCountry by remember { mutableStateOf("US") }
     var selectedGenreTab by remember { mutableStateOf(0) }
-    val scrollState = rememberSaveable(selectedCountry, selectedGenreTab, saver = ScrollState.Saver) {
-        ScrollState(0)
+    val scrollKey = remember(selectedCountry, selectedGenreTab) { "radio:$selectedCountry:$selectedGenreTab" }
+    val initialScroll = remember(scrollKey) { ScreenScrollMemory.scrollOffsets[scrollKey] ?: 0 }
+    val scrollState = rememberScrollState(initial = initialScroll)
+
+    DisposableEffect(scrollKey, scrollState) {
+        onDispose {
+            ScreenScrollMemory.scrollOffsets[scrollKey] = scrollState.value
+        }
     }
 
     val genres = if (genresState is Response.Success) {
