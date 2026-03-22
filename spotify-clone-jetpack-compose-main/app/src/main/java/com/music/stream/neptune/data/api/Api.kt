@@ -813,6 +813,19 @@ class Api @Inject constructor(
         }
     }
 
+    suspend fun getTop10PodcastsByGenres(genre: String): Flow<Response<PodcastBrowseResponse>> = flow {
+        emit(Response.Loading())
+        try {
+            val result = networkApi.getTop10PodcastsByGenres(genre)
+            val podcasts = result.map { it.toDomain() }.distinctBy { it.id }
+            val mapped = PodcastBrowseResponse(results = podcasts, page = 1, total = podcasts.size)
+            emit(Response.Success(mapped))
+        } catch (e: Exception) {
+            Log.e("Api", "Error fetching top 10 podcasts by genre: ${e.message}")
+            emit(Response.Error(e.message ?: "Unknown error"))
+        }
+    }
+
     suspend fun browsePodcastsByGenre(genre: String, page: Int): Flow<Response<PodcastBrowseResponse>> = flow {
         emit(Response.Loading())
         try {

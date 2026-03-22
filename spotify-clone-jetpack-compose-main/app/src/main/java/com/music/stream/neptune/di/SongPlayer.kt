@@ -23,6 +23,9 @@ object SongPlayer {
     private var player: ExoPlayer? = null
     private var playerListener: Player.Listener? = null
 
+    var onSkipToNext: (() -> Unit)? = null
+    var onSkipToPrevious: (() -> Unit)? = null
+
     fun getOrCreatePlayer(context: Context): ExoPlayer {
         val applicationContext = context.applicationContext
         appContext = applicationContext

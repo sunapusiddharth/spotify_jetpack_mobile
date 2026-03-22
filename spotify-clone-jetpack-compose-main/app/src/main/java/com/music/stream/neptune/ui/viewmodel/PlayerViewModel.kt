@@ -96,6 +96,8 @@ class PlayerViewModel @Inject constructor(
         fetchSongs()
         observeUserLikes()
         observeLikedEntityState()
+        SongPlayer.onSkipToNext = { playNext(appContext) }
+        SongPlayer.onSkipToPrevious = { playPrevious(appContext) }
     }
 
     private fun restorePersistedPlayback() {

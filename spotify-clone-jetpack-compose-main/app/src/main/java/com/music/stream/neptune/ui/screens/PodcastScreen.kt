@@ -32,9 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import android.net.Uri
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
 import com.music.stream.neptune.data.api.Response
@@ -68,6 +65,9 @@ fun PodcastScreen(navController: NavController) {
     val podcastsState by podcastViewModel.podcasts.collectAsState()
     val genresState by podcastViewModel.genres.collectAsState()
     val historyState by podcastViewModel.historyEntries.collectAsState()
+    val selectedGenre by podcastViewModel.selectedGenre.collectAsState()
+    val hasMore by podcastViewModel.hasMore.collectAsState()
+    val isFetchingMore by podcastViewModel.isFetchingMore.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
 
     val bgColor = Color(AppBackground.toArgb())
@@ -111,7 +111,6 @@ fun PodcastScreen(navController: NavController) {
             val genres = if (genresState is Response.Success)
                 listOf("All") + (genresState as Response.Success).data
             else listOf("All")
-            var selectedGenre by remember { mutableStateOf("All") }
 
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp),
@@ -121,12 +120,7 @@ fun PodcastScreen(navController: NavController) {
                     FilterChip(
                         selected = selectedGenre == genre,
                         onClick = {
-                            selectedGenre = genre
-                            if (genre == "All") {
-                                podcastViewModel.fetchPodcasts(1)
-                            } else {
-                                navController.navigate("${Routes.PodcastGenre.route}/${Uri.encode(genre)}")
-                            }
+                            podcastViewModel.selectGenre(genre)
                         },
                         label = { Text(genre, fontSize = 13.sp) },
                         colors = FilterChipDefaults.filterChipColors(
@@ -153,10 +147,8 @@ fun PodcastScreen(navController: NavController) {
                 is Response.Loading -> Loader()
                 is Response.Success -> {
                     val podcasts = (podcastsState as Response.Success).data.results
-                    val filtered = if (selectedGenre == "All") podcasts
-                    else podcasts.filter { it.genres.contains(selectedGenre) }
 
-                    if (filtered.isNotEmpty()) {
+                    if (podcasts.isNotEmpty()) {
                         // Featured top podcast
                         Text(
                             "Featured",
@@ -166,20 +158,36 @@ fun PodcastScreen(navController: NavController) {
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                         Spacer(Modifier.height(10.dp))
-                        PodcastFeaturedCard(filtered.first(), navController)
+                        PodcastFeaturedCard(podcasts.first(), navController)
                         Spacer(Modifier.height(24.dp))
 
                         // All podcasts grid
                         Text(
-                            "All Podcasts",
+                            if (selectedGenre == "All") "All Podcasts" else selectedGenre,
                             color = Color.White,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
                         Spacer(Modifier.height(10.dp))
-                        for (podcast in filtered) {
+                        for (podcast in podcasts) {
                             PodcastRowItem(podcast, navController)
+                        }
+
+                        // Pagination - only for "All" genre (browse endpoint is paginated)
+                        if (selectedGenre == "All" && hasMore) {
+                            Spacer(Modifier.height(12.dp))
+                            Box(
+                                modifier = Modifier.fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                androidx.compose.material3.Button(
+                                    onClick = { podcastViewModel.loadNextPage() },
+                                    enabled = !isFetchingMore
+                                ) {
+                                    Text(if (isFetchingMore) "Loading..." else "Load More")
+                                }
+                            }
                         }
                     } else {
                         Box(

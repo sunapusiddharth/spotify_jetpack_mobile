@@ -153,6 +153,9 @@ interface NetworkApi {
     @GET("podcast/browse/{page}")
     suspend fun browsePodcasts(@Path("page") page: Int): WebPodcastsPageInfo
 
+    @GET("podcast/getTop10PodcastsByGenres/{genre}")
+    suspend fun getTop10PodcastsByGenres(@Path("genre") genre: String): List<WebPodcastCardDto>
+
     @GET("podcast/browsePodcastsByGenre/{genre}/{page}")
     suspend fun browsePodcastsByGenre(
         @Path("genre") genre: String,

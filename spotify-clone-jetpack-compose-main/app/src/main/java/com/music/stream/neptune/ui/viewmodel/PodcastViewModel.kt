@@ -57,6 +57,18 @@ class PodcastViewModel @Inject constructor(
     private var activeGenre: String? = null
     private var currentGenrePage: Int = 0
 
+    // Main podcast screen state
+    private val _selectedGenre = MutableStateFlow("All")
+    val selectedGenre = _selectedGenre.asStateFlow()
+
+    private val _isFetchingMore = MutableStateFlow(false)
+    val isFetchingMore = _isFetchingMore.asStateFlow()
+
+    private val _hasMore = MutableStateFlow(true)
+    val hasMore = _hasMore.asStateFlow()
+
+    private var currentPage: Int = 0
+
     private val _selectedEpisodeId = MutableStateFlow<String?>(null)
     val selectedEpisodeId = _selectedEpisodeId.asStateFlow()
 
@@ -64,15 +76,75 @@ class PodcastViewModel @Inject constructor(
     val actionMessage = _actionMessage.asStateFlow()
 
     init {
-        fetchPodcasts(1)
+        fetchTop10PodcastsByGenre("all")
         fetchGenres()
         fetchHistory()
     }
 
     private fun currentUserIdOrEmail(): String = userSessionManager.userIdOrEmail()
 
-    fun fetchPodcasts(page: Int) = viewModelScope.launch(Dispatchers.IO) {
-        repository.provideBrowsePodcasts(page).collect { _podcasts.value = it }
+    fun fetchPodcasts(page: Int, append: Boolean = false) = viewModelScope.launch(Dispatchers.IO) {
+        if (append && _isFetchingMore.value) return@launch
+        if (append) _isFetchingMore.value = true
+        else {
+            currentPage = 0
+            _hasMore.value = true
+        }
+
+        repository.provideBrowsePodcasts(page).collect { incoming ->
+            when (incoming) {
+                is Response.Success -> {
+                    val incomingResults = incoming.data.results
+                    currentPage = incoming.data.page
+
+                    if (append && _podcasts.value is Response.Success) {
+                        val existing = (_podcasts.value as Response.Success<PodcastBrowseResponse>).data
+                        val merged = (existing.results + incomingResults).distinctBy { it.id }
+                        val hasNewItems = merged.size > existing.results.size
+                        _hasMore.value = incomingResults.isNotEmpty() && hasNewItems
+                        _podcasts.value = Response.Success(
+                            PodcastBrowseResponse(results = merged, page = incoming.data.page, total = merged.size)
+                        )
+                    } else {
+                        _hasMore.value = incomingResults.isNotEmpty()
+                        _podcasts.value = incoming
+                    }
+                }
+                is Response.Error -> {
+                    if (!append) {
+                        _podcasts.value = incoming
+                        _hasMore.value = false
+                    }
+                }
+                is Response.Loading -> {
+                    if (!append) _podcasts.value = incoming
+                }
+            }
+            if (incoming is Response.Success || incoming is Response.Error) {
+                _isFetchingMore.value = false
+            }
+        }
+    }
+
+    fun fetchTop10PodcastsByGenre(genre: String) = viewModelScope.launch(Dispatchers.IO) {
+        _hasMore.value = false
+        repository.provideTop10PodcastsByGenre(genre).collect { _podcasts.value = it }
+    }
+
+    fun selectGenre(genre: String) {
+        _selectedGenre.value = genre
+        if (genre == "All") {
+            fetchPodcasts(1)
+        } else {
+            fetchTop10PodcastsByGenre(genre)
+        }
+    }
+
+    fun loadNextPage() {
+        val genre = _selectedGenre.value
+        if (genre != "All") return // Top10 endpoint is not paginated
+        if (!_hasMore.value || _isFetchingMore.value) return
+        fetchPodcasts(page = currentPage + 1, append = true)
     }
 
     fun fetchPodcastsByGenre(genre: String, page: Int = 1) = viewModelScope.launch(Dispatchers.IO) {

@@ -56,6 +56,7 @@ class AppRepository @Inject constructor(private val api: Api) {
     suspend fun provideAllAvailableSongs(skip: Int, limit: Int) = api.getAllAvailableSongs(skip, limit)
 
     suspend fun provideBrowsePodcasts(page: Int) = api.browsePodcasts(page)
+    suspend fun provideTop10PodcastsByGenre(genre: String) = api.getTop10PodcastsByGenres(genre)
     suspend fun provideBrowsePodcastsByGenre(genre: String, page: Int) = api.browsePodcastsByGenre(genre, page)
     suspend fun providePodcastById(id: String) = api.getPodcastById(id)
     suspend fun providePodcastEpisodes(id: String, page: Int) = api.getPodcastEpisodes(id, page)

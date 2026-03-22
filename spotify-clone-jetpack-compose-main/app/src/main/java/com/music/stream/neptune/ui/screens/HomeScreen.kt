@@ -74,7 +74,6 @@ import com.music.stream.neptune.data.entity.SongsModel
 import com.music.stream.neptune.data.entity.UserHistoryEntityModel
 import com.music.stream.neptune.di.SongPlayer
 import com.music.stream.neptune.ui.components.Loader
-import com.music.stream.neptune.ui.components.StaggeredReveal
 import com.music.stream.neptune.ui.components.UnavailableAudioBadge
 import com.music.stream.neptune.ui.components.pressScale
 import com.music.stream.neptune.ui.components.unavailableArtworkColorFilter
@@ -214,20 +213,16 @@ fun SumUpHomeScreen(
     ) {
         if (historyEntries.isNotEmpty()) {
             item(key = "history_entries") {
-                StaggeredReveal(index = 0) {
-                    HomeHistorySection(
-                        navController = navController,
-                        playerViewModel = playerViewModel,
-                        entries = historyEntries
-                    )
-                }
+                HomeHistorySection(
+                    navController = navController,
+                    playerViewModel = playerViewModel,
+                    entries = historyEntries
+                )
             }
         }
 
-        item {
-            StaggeredReveal(index = 1) {
-                HomePodcastsSection(navController = navController, podcasts = topPodcasts)
-            }
+        item(key = "top_podcasts") {
+            HomePodcastsSection(navController = navController, podcasts = topPodcasts)
         }
 
         items(
@@ -235,16 +230,11 @@ fun SumUpHomeScreen(
             key = { index -> "home_section_${homeSectionUiKey(displaySections[index])}" }
         ) { index ->
             val section = displaySections[index]
-            val revealIndex = 2 + index
-            StaggeredReveal(index = revealIndex) {
-                HomeCardSection(navController = navController, section = section, playerViewModel = playerViewModel)
-            }
+            HomeCardSection(navController = navController, section = section, playerViewModel = playerViewModel)
         }
 
-        item {
-            StaggeredReveal(index = 12) {
-                HomeStationsSection(navController = navController, stations = topStations)
-            }
+        item(key = "top_stations") {
+            HomeStationsSection(navController = navController, stations = topStations)
         }
 
         if (isLoadingNextHomePage) {
@@ -291,7 +281,7 @@ private fun HomeHistorySection(
         Spacer(Modifier.height(HomeSectionHeaderBottomGap))
 
         LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
-            items(entries.size) { index ->
+            items(entries.size, key = { entries[it].entityId }) { index ->
                 val entry = entries[index]
                 val isPlayable = entry.isSong || entry.isRadioStation || entry.isPodcastEpisode
                 val interactionSource = remember { MutableInteractionSource() }
@@ -419,9 +409,10 @@ private fun HomeCardSection(navController: NavController, section: HomePageSecti
         Spacer(Modifier.height(HomeSectionHeaderBottomGap))
 
         LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
-            items(section.cards.size) { index ->
+            items(section.cards.size, key = { section.cards[it].id }) { index ->
                 val card = section.cards[index]
                 val isPlayableSong = card.song?.s3link?.isNotBlank() == true
+                val isClickable = isPlayableSong || card.song == null
                 val interactionSource = remember { MutableInteractionSource() }
                 Box(
                     modifier = Modifier
@@ -430,18 +421,22 @@ private fun HomeCardSection(navController: NavController, section: HomePageSecti
                         .height(172.dp)
                         .pressScale(interactionSource, pressedScale = 0.94f)
                         .clickable(
-                            enabled = isPlayableSong,
+                            enabled = isClickable,
                             interactionSource = interactionSource,
                             indication = null
                         ) {
-                            card.song?.let { song ->
-                                val startIndex = playableSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
-                                playerViewModel.startSongPlayback(
-                                    queueSongs = playableSongs,
-                                    startIndex = startIndex,
-                                    album = section.label.ifBlank { section.id.ifBlank { "home" } },
-                                    context = context
-                                )
+                            if (isPlayableSong) {
+                                card.song?.let { song ->
+                                    val startIndex = playableSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+                                    playerViewModel.startSongPlayback(
+                                        queueSongs = playableSongs,
+                                        startIndex = startIndex,
+                                        album = section.label.ifBlank { section.id.ifBlank { "home" } },
+                                        context = context
+                                    )
+                                }
+                            } else {
+                                navigateToHomeCard(navController, card)
                             }
                         }
                 ) {
@@ -529,7 +524,7 @@ private fun HomeSongsSection(title: String, songs: List<SongsModel>, playerViewM
         Spacer(Modifier.height(HomeSectionHeaderBottomGap))
 
         LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
-            items(songs.size) { index ->
+            items(songs.size, key = { songs[it].id }) { index ->
                 val song = songs[index]
                 val isPlayable = song.hasPlayableAudio
                 val interactionSource = remember { MutableInteractionSource() }
@@ -617,7 +612,7 @@ private fun HomeStationsSection(navController: NavController, stations: List<Rad
         Spacer(Modifier.height(HomeSectionHeaderBottomGap))
 
         LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
-            items(stations.size) { index ->
+            items(stations.size, key = { stations[it].id }) { index ->
                 val station = stations[index]
                 val interactionSource = remember { MutableInteractionSource() }
                 Box(
@@ -689,7 +684,7 @@ private fun HomePodcastsSection(navController: NavController, podcasts: List<Pod
         Spacer(Modifier.height(HomeSectionHeaderBottomGap))
 
         LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
-            items(podcasts.size) { index ->
+            items(podcasts.size, key = { podcasts[it].id }) { index ->
                 val podcast = podcasts[index]
                 val interactionSource = remember { MutableInteractionSource() }
                 Box(
@@ -979,7 +974,7 @@ fun HomeAlbums(album: List<AlbumsModel>, navController: NavController) {
         Spacer(Modifier.height(HomeSectionHeaderBottomGap))
 
         LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
-            items(displayAlbums.size) { index ->
+            items(displayAlbums.size, key = { displayAlbums[it].id }) { index ->
                 val a = displayAlbums[index]
                 val interactionSource = remember { MutableInteractionSource() }
                 Box(
@@ -1059,7 +1054,7 @@ fun HomeArtists(artists: List<ArtistsModel>, navController: NavController) {
         Spacer(Modifier.height(HomeSectionHeaderBottomGap))
 
         LazyRow(modifier = Modifier.padding(horizontal = 6.dp, vertical = 0.dp)) {
-            items(artists.size) { index ->
+            items(artists.size, key = { artists[it].id }) { index ->
                 val artist = artists[index]
                 val interactionSource = remember { MutableInteractionSource() }
                 Box(

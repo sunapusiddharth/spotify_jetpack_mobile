@@ -6,7 +6,11 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.NotificationCompat
+import androidx.media3.common.ForwardingPlayer
+import androidx.media3.common.Player
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.ui.PlayerNotificationManager
@@ -20,14 +24,56 @@ class PlaybackService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
     private var playerNotificationManager: PlayerNotificationManager? = null
+    private var forwardingPlayer: ForwardingPlayer? = null
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         startForeground(notificationId, buildPlaceholderNotification())
 
-        val player = SongPlayer.getOrCreatePlayer(this)
-        mediaSession = MediaSession.Builder(this, player).build()
+        val exoPlayer = SongPlayer.getOrCreatePlayer(this)
+        val wrappedPlayer = object : ForwardingPlayer(exoPlayer) {
+            override fun getAvailableCommands(): Player.Commands {
+                return super.getAvailableCommands().buildUpon()
+                    .add(Player.COMMAND_SEEK_TO_NEXT)
+                    .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                    .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                    .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                    .build()
+            }
+
+            override fun isCommandAvailable(command: Int): Boolean {
+                return when (command) {
+                    Player.COMMAND_SEEK_TO_NEXT,
+                    Player.COMMAND_SEEK_TO_PREVIOUS,
+                    Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+                    Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> true
+                    else -> super.isCommandAvailable(command)
+                }
+            }
+
+            override fun seekToNext() {
+                Handler(Looper.getMainLooper()).post {
+                    SongPlayer.onSkipToNext?.invoke()
+                }
+            }
+
+            override fun seekToPrevious() {
+                Handler(Looper.getMainLooper()).post {
+                    SongPlayer.onSkipToPrevious?.invoke()
+                }
+            }
+
+            override fun seekToNextMediaItem() {
+                seekToNext()
+            }
+
+            override fun seekToPreviousMediaItem() {
+                seekToPrevious()
+            }
+        }
+        forwardingPlayer = wrappedPlayer
+        mediaSession = MediaSession.Builder(this, wrappedPlayer).build()
 
         playerNotificationManager = PlayerNotificationManager.Builder(this, notificationId, channelId)
             .setMediaDescriptionAdapter(object : PlayerNotificationManager.MediaDescriptionAdapter {
@@ -74,7 +120,7 @@ class PlaybackService : MediaSessionService() {
             .apply {
                 setUseNextActionInCompactView(true)
                 setUsePreviousActionInCompactView(true)
-                setPlayer(player)
+                setPlayer(wrappedPlayer)
             }
     }
 
