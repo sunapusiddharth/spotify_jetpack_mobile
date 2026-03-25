@@ -308,6 +308,25 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    fun playRadioById(stationId: String, context: Context) {
+        val queue = currentSongState.getRadioSourceQueue()
+        if (stationId.isBlank() || queue.isEmpty()) return
+        val targetIndex = queue.indexOfFirst { it.id == stationId }
+        if (targetIndex >= 0) {
+            startRadioPlayback(queue, targetIndex, context)
+        }
+    }
+
+    fun playPodcastEpisodeById(episodeId: String, context: Context) {
+        val podcast = activePodcast.value ?: return
+        val queue = currentSongState.getPodcastSourceQueue()
+        if (episodeId.isBlank() || queue.isEmpty()) return
+        val targetIndex = queue.indexOfFirst { it.id == episodeId }
+        if (targetIndex >= 0) {
+            startPodcastPlayback(podcast, queue, targetIndex, context)
+        }
+    }
+
     fun playSongQueueFromPlaylist(
         queueSongs: List<SongsModel>,
         startIndex: Int,

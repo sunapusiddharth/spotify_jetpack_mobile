@@ -1,4 +1,8 @@
+
 package com.music.stream.neptune.ui.components
+
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.ThumbUp
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -227,8 +231,7 @@ fun MiniPlayer() {
                                 miniPlayerViewModel.toggleLikeCurrentMedia()
                             }
                         },
-                    painter = if (isLiked) painterResource(id = R.drawable.added)
-                    else painterResource(id = R.drawable.ic_add),
+                    imageVector = if (isLiked) androidx.compose.material.icons.Icons.Filled.ThumbUp else androidx.compose.material.icons.Icons.Outlined.ThumbUp,
                     tint = if (canLikeCurrentMedia) Color.White else Color.LightGray,
                     contentDescription = ""
                 )

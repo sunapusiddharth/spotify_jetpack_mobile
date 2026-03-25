@@ -33,6 +33,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LibraryAdd
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.ThumbUp
+import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -73,6 +76,8 @@ import com.bumptech.glide.integration.compose.GlideImage
 import com.bumptech.glide.integration.compose.placeholder
 import com.music.stream.neptune.R
 import com.music.stream.neptune.data.api.Response
+import com.music.stream.neptune.data.entity.PodcastEpisodeModel
+import com.music.stream.neptune.data.entity.RadioStationModel
 import com.music.stream.neptune.data.entity.SongsModel
 import com.music.stream.neptune.di.PlaybackMediaType
 import com.music.stream.neptune.di.Palette
@@ -385,47 +390,67 @@ fun PlayerScreen(navController: NavController, onDismiss: (() -> Unit)? = null) 
                         contentDescription = "Devices"
                     )
                     // Queue toggle button
-                    if (mediaType == PlaybackMediaType.SONG) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null
-                            ) { showQueue = true }
-                        ) {
-                            Icon(
-                                modifier = Modifier.size(20.dp),
-                                painter = painterResource(id = R.drawable.ic_share),
-                                tint = Color.White,
-                                contentDescription = "Queue"
-                            )
-                            Text(
-                                text = "Up Next",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { showQueue = true }
+                    ) {
+                        Icon(
+                            modifier = Modifier.size(20.dp),
+                            imageVector = Icons.Filled.QueueMusic,
+                            tint = Color.White,
+                            contentDescription = "Queue"
+                        )
+                        Text(
+                            text = "Up Next",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                 }
             }
         }
 
         // ── Queue Sheet Overlay ──────────────────────────────────────────────
-        val activeSongQueue = playerViewModel.songQueue.value
         AnimatedVisibility(
-            visible = showQueue && mediaType == PlaybackMediaType.SONG,
+            visible = showQueue,
             enter = slideInVertically(initialOffsetY = { it }),
             exit = slideOutVertically(targetOffsetY = { it })
         ) {
-            QueueSheet(
-                queueSongs = activeSongQueue,
-                currentSongId = songId,
-                playerViewModel = playerViewModel,
-                context = context,
-                onDismiss = { showQueue = false }
-            )
+            when (mediaType) {
+                PlaybackMediaType.SONG -> {
+                    QueueSheet(
+                        queueSongs = playerViewModel.songQueue.value,
+                        currentSongId = songId,
+                        playerViewModel = playerViewModel,
+                        context = context,
+                        onDismiss = { showQueue = false }
+                    )
+                }
+                PlaybackMediaType.RADIO -> {
+                    RadioQueueSheet(
+                        stations = playerViewModel.radioQueue.value,
+                        currentStationId = songId,
+                        playerViewModel = playerViewModel,
+                        context = context,
+                        onDismiss = { showQueue = false }
+                    )
+                }
+                PlaybackMediaType.PODCAST -> {
+                    PodcastQueueSheet(
+                        episodes = playerViewModel.podcastQueue.value,
+                        currentEpisodeId = songId,
+                        podcastTitle = playerViewModel.activePodcast.value?.title ?: "Podcast",
+                        playerViewModel = playerViewModel,
+                        context = context,
+                        onDismiss = { showQueue = false }
+                    )
+                }
+            }
         }
 
         if (showPlaylistPicker && mediaType == PlaybackMediaType.SONG) {
@@ -707,6 +732,276 @@ fun QueueSheet(
     }
 }
 
+// ─── Radio Queue Sheet ───────────────────────────────────────────────────────
+
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+fun RadioQueueSheet(
+    stations: List<RadioStationModel>,
+    currentStationId: String,
+    playerViewModel: PlayerViewModel,
+    context: Context,
+    onDismiss: () -> Unit
+) {
+    val listState = rememberLazyListState()
+    val currentIndex = stations.indexOfFirst { it.id == currentStationId }
+
+    LaunchedEffect(currentStationId) {
+        if (currentIndex >= 0) {
+            listState.scrollToItem(maxOf(0, currentIndex - 1))
+        }
+    }
+
+    QueueSheetContainer(
+        title = "Stations",
+        subtitle = if (stations.isNotEmpty()) "${stations.size} stations" else null,
+        emptyMessage = "No stations in queue",
+        isEmpty = stations.isEmpty(),
+        onDismiss = onDismiss
+    ) {
+        LazyColumn(state = listState) {
+            itemsIndexed(stations, key = { _, station -> station.id }) { _, station ->
+                val isCurrent = station.id == currentStationId
+                QueueItemRow(
+                    imageModel = station.coverUri,
+                    title = station.name,
+                    subtitle = station.country,
+                    isCurrent = isCurrent,
+                    onClick = { playerViewModel.playRadioById(station.id, context) }
+                )
+            }
+            item { Spacer(Modifier.height(40.dp)) }
+        }
+    }
+}
+
+// ─── Podcast Queue Sheet ─────────────────────────────────────────────────────
+
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+fun PodcastQueueSheet(
+    episodes: List<PodcastEpisodeModel>,
+    currentEpisodeId: String,
+    podcastTitle: String,
+    playerViewModel: PlayerViewModel,
+    context: Context,
+    onDismiss: () -> Unit
+) {
+    val listState = rememberLazyListState()
+    val currentIndex = episodes.indexOfFirst { it.id == currentEpisodeId }
+
+    LaunchedEffect(currentEpisodeId) {
+        if (currentIndex >= 0) {
+            listState.scrollToItem(maxOf(0, currentIndex - 1))
+        }
+    }
+
+    QueueSheetContainer(
+        title = podcastTitle,
+        subtitle = if (episodes.isNotEmpty()) "${episodes.size} episodes" else null,
+        emptyMessage = "No episodes in queue",
+        isEmpty = episodes.isEmpty(),
+        onDismiss = onDismiss
+    ) {
+        LazyColumn(state = listState) {
+            itemsIndexed(episodes, key = { _, ep -> ep.id }) { _, episode ->
+                val isCurrent = episode.id == currentEpisodeId
+                QueueItemRow(
+                    imageModel = episode.thumbnail,
+                    title = episode.title,
+                    subtitle = if (episode.episode_number > 0) "Episode ${episode.episode_number}" else "",
+                    durationMs = episode.duration,
+                    isCurrent = isCurrent,
+                    onClick = { playerViewModel.playPodcastEpisodeById(episode.id, context) }
+                )
+            }
+            item { Spacer(Modifier.height(40.dp)) }
+        }
+    }
+}
+
+// ─── Shared Queue UI Components ──────────────────────────────────────────────
+
+@Composable
+private fun QueueSheetContainer(
+    title: String,
+    subtitle: String?,
+    emptyMessage: String,
+    isEmpty: Boolean,
+    onDismiss: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.97f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) { /* absorb clicks */ }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp, 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (subtitle != null) {
+                        Text(text = subtitle, color = Color.Gray, fontSize = 13.sp)
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.12f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) { onDismiss() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp),
+                        contentDescription = "Close"
+                    )
+                }
+            }
+
+            if (isEmpty) {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(emptyMessage, color = Color.Gray, fontSize = 14.sp)
+                }
+            } else {
+                content()
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalGlideComposeApi::class)
+@Composable
+private fun QueueItemRow(
+    imageModel: String,
+    title: String,
+    subtitle: String,
+    durationMs: Int = 0,
+    isCurrent: Boolean,
+    onClick: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val bgColor by animateColorAsState(
+        targetValue = if (isCurrent) Color.White.copy(alpha = 0.08f) else Color.Transparent,
+        animationSpec = spring(stiffness = 320f),
+        label = "queueItemHighlight"
+    )
+    val itemScale by animateFloatAsState(
+        targetValue = if (isCurrent) 1.015f else 1f,
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 380f),
+        label = "queueItemScale"
+    )
+
+    Row(
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer(scaleX = itemScale, scaleY = itemScale)
+            .background(bgColor)
+            .pressScale(interactionSource, pressedScale = 0.985f)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) { onClick() }
+            .padding(horizontal = 20.dp, vertical = 10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            Box {
+                GlideImage(
+                    modifier = Modifier
+                        .size(50.dp)
+                        .clip(RoundedCornerShape(6.dp)),
+                    model = imageModel,
+                    contentScale = ContentScale.Crop,
+                    loading = placeholder(R.drawable.placeholder),
+                    failure = placeholder(R.drawable.placeholder),
+                    contentDescription = ""
+                )
+                if (isCurrent) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.5f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_playing),
+                            tint = Color(AppPalette.toArgb()),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    color = if (isCurrent) Color(AppPalette.toArgb()) else Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        color = Color.Gray,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+
+        if (durationMs > 0) {
+            Text(
+                text = formatMillis(durationMs),
+                color = Color.Gray,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(start = 8.dp)
+            )
+        }
+    }
+}
+
 // ─── Top Bar ──────────────────────────────────────────────────────────────────
 
 @Composable
@@ -795,8 +1090,7 @@ fun PlayerInfo(
             Spacer(Modifier.width(12.dp))
             IconButton(onClick = onLike) {
                 Icon(
-                    painter = if (isLiked) painterResource(id = R.drawable.added)
-                    else painterResource(id = R.drawable.ic_add),
+                    imageVector = if (isLiked) androidx.compose.material.icons.Icons.Filled.ThumbUp else androidx.compose.material.icons.Icons.Outlined.ThumbUp,
                     tint = if (isLiked) Color.Red else Color.White,
                     contentDescription = if (isLiked) "Unlike" else "Like",
                     modifier = Modifier

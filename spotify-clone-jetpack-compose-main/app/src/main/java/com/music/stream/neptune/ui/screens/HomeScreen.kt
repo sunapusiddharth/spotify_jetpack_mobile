@@ -765,20 +765,22 @@ private fun navigateToHomeSection(navController: NavController, section: HomePag
         section.path.contains("playlist/") -> {
             navController.navigate("${Routes.Playlist.route}/${extractTrailingId(section.path, section.id)}")
         }
-        section.path.startsWith("/playlist_collection") -> {
+        section.path.trimStart('/').startsWith("playlist_collection") -> {
             navController.navigate("${Routes.Playlist.route}/${extractTrailingId(section.path, section.id)}")
         }
-        section.path.startsWith("/artist") -> {
+        section.path.trimStart('/').startsWith("album") -> {
+            navController.navigate("${Routes.Album.route}/${extractTrailingId(section.path, section.id)}")
+        }
+        section.path.trimStart('/').startsWith("artist") -> {
             navController.navigate("${Routes.Artist.route}/${extractTrailingId(section.path, section.id)}")
         }
-        section.path.startsWith("/podcast") -> {
+        section.path.trimStart('/').startsWith("podcast") -> {
             navController.navigate("${Routes.Podcast.route}")
         }
     }
 }
-
 private fun sectionNavigatesToPlaylistCollection(section: HomePageSectionModel): Boolean {
-    return section.path.startsWith("/playlist_collection")
+    return section.path.trimStart('/').startsWith("playlist_collection")
 }
 
 private fun extractTrailingId(path: String, fallbackId: String): String {

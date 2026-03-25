@@ -50,6 +50,12 @@ object SongPlayer {
                     }
                     exoPlayer.pause()
                 }
+
+                override fun onPlaybackStateChanged(state: Int) {
+                    if (state == Player.STATE_ENDED) {
+                        onSkipToNext?.invoke()
+                    }
+                }
             }
             exoPlayer.addListener(listener)
             playerListener = listener

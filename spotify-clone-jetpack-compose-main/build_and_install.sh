@@ -185,13 +185,16 @@ verify_installation() {
 
 # Step 11: Launch the app (optional)
 launch_app() {
-    read -p "Do you want to launch the app now? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Launching app..."
-        adb shell am start -n "$APP_PACKAGE/.MainActivity"
-        log_success "App launched"
-    fi
+    log_info "Launching app..."
+    adb shell am start -n "$APP_PACKAGE/.MainActivity"
+    log_success "App launched"
+    # read -p "Do you want to launch the app now? (y/n) " -n 1 -r
+    # echo
+    # if [[ $REPLY =~ ^[Yy]$ ]]; then
+    #     log_info "Launching app..."
+    #     adb shell am start -n "$APP_PACKAGE/.MainActivity"
+    #     log_success "App launched"
+    # fi
 }
 
 # Main execution
